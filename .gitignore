@@ -381,5 +381,6 @@ android/keystore/
 *.keystore
 
 # 内核交叉编译产物与依赖缓存
+/kernel/
 kernel-build/
 kernel/vendor/

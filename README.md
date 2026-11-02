@@ -1,82 +1,113 @@
-# 🚀 SubsCheck-Win-GUI
-首先声明，这款软件并非我原创开发。Subs-Check是由 [bestruirui](https://github.com/bestruirui/BestSub) 原创、由 [beck-8](https://github.com/beck-8/subs-check) 进行二次开发，而我所编写的 GUI 仅是在这两位开发者的原始版本基础上进行的 **二次开发**。
+# SubsCheck for Android
 
-- **视频教程：[永久免费0门槛！小白也有无限高速代理节点！](https://youtu.be/sS9Tuf1PCyc)**
-- **数字签名：[关于项目报毒说明](https://www.youtube.com/watch?v=4906t5zygAE&t=123s)**
-- **Telegram交流群：[@CMLiussss](https://t.me/CMLiussss)**
+把 [beck-8/subs-check](https://github.com/beck-8/subs-check) 的 Go 检测内核直接跑在 Android 上的原生 App。
+内核做全部测活/测速/媒体检测，App 提供界面、配置管理与订阅导出。
 
-# ⚠️ 免责声明
-本项目仅供学习、研究与安全测试使用，请勿用于任何非法活动。使用前请确保您已了解并遵守所在地的法律法规。
-
-### 📋 使用条款
-
-- **教育与研究用途**：本软件仅可用于网络技术和编程领域的学习、研究和安全测试。
-- **禁止非法使用**：严禁将 **SubsCheck-Win-GUI** 用于任何非法活动或违反使用者所在地区法律法规的行为。
-- **使用时限**：基于学习和研究目的，建议用户在完成研究或学习后，或在安装后的**24小时内，删除本软件及所有相关文件。**
-- **免责声明**：**SubsCheck-Win-GUI** 的创建者和贡献者不对因使用或滥用本软件而导致的任何损害或法律问题负责。
-- **用户责任**：**用户对使用本软件的方式以及由此产生的任何后果完全负责。**
-- **无技术支持**：本软件的创建者不提供任何技术支持或使用协助。
-- **知情同意**：使用 **SubsCheck-Win-GUI** 即表示您已阅读并理解本免责声明，并同意受其条款的约束。
-
-> [!WARNING]
-> **请记住**：本软件的主要目的是促进学习、研究和安全测试。作者不支持或认可任何其他用途。使用者应当在合法和负责任的前提下使用本工具。
+> 内核与 Sub-Store 均为 **GNU GPL v3**，本 App 同样以 GPL v3 发布。
 
 ---
 
-![GUI](./gui.png)
+## 它是什么
 
-## 🖥️ 系统要求
-- **操作系统**: Windows 10/11 (32位/64位)
-- **.NET 框架**: .NET Framework 4.7.2 或更高版本
+Windows 版 SubsCheck 依赖 proot / Termux 那套才能上安卓。本 App 换了思路：
 
-> [!CAUTION]
-> **系统兼容性说明**: 本软件不支持Windows 7及更早版本。因为核心组件subs-check使用Go语言编译，而Go 1.19及以后版本已正式放弃对Windows 7的支持。
+- 内核用 `GOOS=linux` **静态 ET_EXEC** 交叉编译（不是 PIE、不是 GOOS=android），
+  以 `libsubscheck.so` 的名字塞进 APK 的 `jniLibs`，
+  靠 `android:extractNativeLibs="true"` 落到 `nativeLibraryDir` 后**直接 exec**。
+- 因此 `targetSdk` 被锁在 **28**——Android 10+ 仅允许 targetSdk < 29 的应用执行可写目录里的二进制。
+- 不用 Sub-Store、不打包 Node：`sub-store-port` 被 patch 成空字符串，
+  clash 完整配置由 App 自己拼（内置 ACL4SSR 模板 + 内核产出的 proxies）。
 
-## 💾 测速结果 保存方法
+## 安装
 
-- **本地**：将结果保存到本地,默认保存到可执行文件目录下的 output 文件夹
-- **r2**：将结果保存到 cloudflare r2 存储桶 [配置方法](https://github.com/beck-8/subs-check/blob/master/doc/r2.md)
-- **gist**：将结果保存到 github gist [配置方法](https://github.com/beck-8/subs-check/blob/master/doc/gist.md)
-- **webdav**：将结果保存到 webdav 服务器 [配置方法](https://github.com/beck-8/subs-check/blob/master/doc/webdav.md)
+| 包 | 适用 | SHA-256 |
+|---|---|---|
+| `SubsCheck-1.0.0-arm64-v8a.apk` | 2018 年之后绝大多数手机 | `3315b38b063e30a2336b3c38ed2db47fe2194e83313da43c835bd28a237a5a4a` |
+| `SubsCheck-1.0.0-armeabi-v7a.apk` | 老 32 位设备 | `bc9602edbb93adf1a5777411adef65598d08e0437c998c4b15069888f2e211f4` |
 
-## 📦 关于 Github Proxy
-- **Github Proxy**：本项目使用了 `Github Proxy` 来加速 GUI 必要内容的加载。
-> [!Tip]
-> 你也可以通过 https://github.com/cmliu/CF-Workers-GitHub 项目来搭建自己专属的 **Github Proxy**。
+`minSdkVersion` = 24（Android 7.0），`targetSdkVersion` = 28，`versionName` = 1.0.0。
+校验：
 
-## 📁 GUI 文件结构
-```shell
-subs-check.win.gui.exe       # GUI本体
-subs-check.exe               # subs-check x86_32位 内核本体  
-subs-check_Windows_i386.zip  # subs-check x86_32位 内核压缩包  
-Upgrade.exe                  # 升级程序
-Upgrade.ini                  # 升级配置文件
-config
- ├─ config.yaml              # subs-check 配置文件  
- └─ more.yaml                # 补充YAML参数配置文件  
-output
- ├─ ACL4SSR_Online_Full.yaml # ACL4SSR_Online_Full.yaml 覆写配置文件
- ├─ all.yaml                 # yaml格式 测试结果
- ├─ base64.txt               # base64格式 测试结果
- ├─ bdg.yaml                 # 布丁狗的订阅转换.yaml 覆写配置文件
- ├─ mihomo.yaml              # clash订阅文件 带分流规则
- ├─ node.exe                 # sub-store 服务
- ├─ root.json                # sub-store 配置文件
- ├─ sub-store.bundle.js      # sub-store js文件
- ├─ sub-store.json           # sub-store json文件
- └─ sub-store.log            # sub-store 日志
-Newtonsoft.Json.dll          # 验证版本信息组件
-Newtonsoft.Json.xml          # 验证版本信息组件
-YamlDotNet.dll               # yaml读写组件
-YamlDotNet.xml               # yaml读写组件
+```bash
+cd dist
+sha256sum -c SHA256SUMS.txt
 ```
 
-## ⭐ Star 星星走起
-[![Stargazers over time](https://starchart.cc/cmliu/SubsCheck-Win-GUI.svg?variant=adaptive)](https://starchart.cc/cmliu/SubsCheck-Win-GUI)
+安装时系统会提示「此应用专为旧版 Android 打造」，属正常现象（就是上面说的 targetSdk=28）。
 
-## 💻 已适配客户端
-   - [v2rayN](https://github.com/2dust/v2rayN)
-   - [mihomo-party](https://github.com/mihomo-party-org/mihomo-party)，[FlClash](https://github.com/chen08209/FlClash)，[clash-verge-rev](https://github.com/clash-verge-rev/clash-verge-rev)，[Clash Nyanpasu](https://github.com/keiko233/clash-nyanpasu)
+## 使用
 
-# 🙏 致谢
-[beck-8](https://github.com/beck-8/subs-check)、[bestruirui](https://github.com/bestruirui/BestSub)、[Sub-Store](https://github.com/sub-store-org/Sub-Store)、GPT
+1. 首次打开 → 点「启动内核」。首次启动会自动写出 `config.yaml`（在 App 私有目录）。
+2. 「概览 → 立即检测一轮」拉取订阅源并开始测活/测速。一轮完整检测通常 10~30 分钟。
+3. 「节点」看结果（可按速度排序、点开看协议详情）。
+4. 「订阅」页导出：
+   - **完整 mihomo 配置**：proxies + proxy-groups + rule-providers + rules（内置 ACL4SSR 模板）
+   - **仅节点**：只有 proxies
+   导出文件写到 `Android/data/com.subscheck.subscheck/files/exports/`，可直接分享给其他设备/clash 客户端。
+5. 「设置」里可以：
+   - 改监听地址与端口（默认 `127.0.0.1:8199`）
+   - 直接编辑 `config.yaml`（订阅源、并发、超时、测速阈值等都在这里）
+   - 查看 API Key（外部工具调内核 HTTP API 用，头名 `X-API-Key`）
+
+### 内核 HTTP API
+
+内核跑起来后监听 `127.0.0.1:8199`，除订阅导出外都只允许本机访问：
+
+```
+GET  /all.yaml /mihomo.yaml /base64.txt   ← 结果导出
+GET  /sub/<file>                           ← 静态输出
+GET  /export/:target                      ← 转换导出
+POST /api/trigger-check                    ← 触发一轮检测（需 X-API-Key）
+GET  /api/status /api/results /api/logs    ← 状态（需 X-API-Key）
+```
+
+## 从源码构建
+
+本仓库包含 Android App 源码，不包含 Go 检测内核的源码。内核上游位于
+[beck-8/subs-check](https://github.com/beck-8/subs-check)；当前 APK 使用的预编译内核已放在
+`android/app/src/main/jniLibs/`。
+
+安装 Flutter、Android SDK 和 JDK 后，在仓库根目录执行：
+
+```bash
+flutter pub get
+flutter build apk --release --split-per-abi --target-platform android-arm,android-arm64
+```
+
+产物在 `build/app/outputs/flutter-apk/`。
+
+签名使用 `android/keystore/subscheck-release.jks`（口令见 `android/app/build.gradle.kts`）；
+**分发给他人前请换成你自己的 keystore**，否则任何人都能用这份私钥给「同一应用」发更新。
+
+调试时可用 `-PtargetAbi=x86_64` 只打 x86_64 包给模拟器（该模拟器必须能原生执行 x86_64；
+ARM 内核在 x86 模拟器的 ARM 转译层下会触发 Go runtime 崩溃，属模拟器限制）。
+
+## 已知限制
+
+- **targetSdk=28** 是硬约束。Google Play 对 targetSdk 有最低要求，本 App 不适合上架 Play。
+- 部分国产 ROM 的后台限制会杀掉长任务，建议在系统设置里给 App 加白名单（「设置 → 通知权限」页有提示）。
+- 默认订阅源里有几条已失效（上游仓库删除），可在 `config.yaml` 的 `sub-urls` 里自行增删。
+- 分享导出文件依赖系统分享面板，个别精简 ROM 可能没有可用目标，可直接从文件管理器取文件。
+
+## 目录结构
+
+```
+lib/                     Flutter UI
+  src/api.dart           内核 HTTP 客户端
+  src/app_state.dart     全局状态与 2 秒轮询
+  src/exporter.dart      拼接完整 mihomo 配置
+  src/native.dart        MethodChannel 桥
+  pages/                 概览/节点/订阅/设置/日志
+android/app/src/main/kotlin/com/subscheck/subscheck/
+  KernelManager.kt       内核进程生命周期、配置 patch、日志缓冲
+  KernelService.kt       前台服务（保活）
+assets/                  ACL4SSR 模板、config.yaml 模板
+android/app/src/main/jniLibs/
+                         APK 内置的各 ABI 预编译内核
+docs/                    移植方案与进度记录
+```
+
+## 许可
+
+GPL v3。内核版权归 [beck-8/subs-check](https://github.com/beck-8/subs-check) 与
+[bestruirui/BestSub](https://github.com/bestruirui/BestSub) 的作者所有。

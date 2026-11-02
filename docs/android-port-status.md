@@ -18,7 +18,7 @@
 
 `build/app/outputs/flutter-apk/app-x86_64-release-test.apk`（36.5MB）只用于模拟器验证，**不要分发**。
 
-签名证书：`CN=SubsCheck`，SHA-256 `d3af548e20c9dcb10da3097101383340e0412c98267df649c7b7e50402a0eb9b`，keystore 在 `android/keystore/subscheck-release.jks`（口令 `subscheck2026`，alias `subscheck`，有效期 30 年）。
+发布签名 keystore 不纳入版本控制。请使用自己的签名密钥进行分发构建。
 
 - minSdk 24 / targetSdk 28 / versionCode arm64=2001 armv7=1001 / versionName 1.0.0
 - 应用图标已换成自绘的蓝色圆角对勾（5 个 mipmap 密度全覆盖），启动器实测正常。
@@ -42,11 +42,12 @@ Dart HTTP 客户端 (lib/src/api.dart) 带 X-API-Key
 
 ## 源码位置
 
-- 内核对上游的补丁：`kernel/android_support_linux.go`（DNS + 系统 CA）、`kernel/assets/assets_slim.go` 与各 `assets_*.go` 的 build tag（slim）
-- 内核源码 = beck-8/subs-check @ 3c320fd5 + 上述补丁
-- 预编译内核：`kernel-build/slim/{arm64,armv7,x86_64}.so`
+- Go 内核上游：[beck-8/subs-check](https://github.com/beck-8/subs-check)，本地构建基于 commit `3c320fd5` 及 Android 适配补丁。
+- 内核源码是独立 checkout，不包含在本 Android 仓库中；仓库内只保留 APK 使用的预编译内核：`android/app/src/main/jniLibs/`。
 
 ### 重新编译内核
+
+以下命令需要单独准备包含 Android 适配补丁的内核源码 checkout；本仓库不包含该源码或 `kernel-build/` 产物。
 
 ```bash
 export PATH=/d/Android/go/bin:$PATH GOPATH=/d/Android/gopath GOMODCACHE=/d/Android/gopath/pkg/mod
