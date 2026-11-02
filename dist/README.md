@@ -34,6 +34,7 @@ Windows 版 SubsCheck 依赖 proot / Termux 那套才能上安卓。本 App 换�
 - 关于页支持 **检查更新**：读取 GitHub Release，自动按设备 ABI 选择安装包，可直连或走镜像下载并直接调起安装器。
 - 关于页可直接打开项目地址、内核地址、内核发布页、上游安卓部署说明与分流模板来源（失败时回落为系统分享）。
 - 修正内核版本号解析（新版内核 `/api/version` 返回 JSON）。
+
 校验：`sha256sum -c SHA256SUMS.txt`。
 
 安装时系统会提示「此应用专为旧版 Android 打造」，属正常现象（就是上面说的 targetSdk=28）。
