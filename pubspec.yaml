@@ -1,0 +1,26 @@
+name: subscheck
+description: "SubsCheck 安卓版：订阅节点检测与导出"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  http: ^1.2.2
+  yaml: ^3.1.2
+  share_plus: ^10.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/config_template.yaml
+    - assets/ACL4SSR_Online_Full.yaml

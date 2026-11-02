@@ -362,3 +362,24 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# ===== Flutter / Android =====
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+build/
+*.iml
+.idea/
+
+# Android 构建产物
+android/.gradle/
+android/local.properties
+android/app/build/
+android/keystore/
+*.jks
+*.keystore
+
+# 内核交叉编译产物与依赖缓存
+kernel-build/
+kernel/vendor/
