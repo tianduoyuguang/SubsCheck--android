@@ -17,6 +17,7 @@ class AppState extends ChangeNotifier {
   List<NodeItem> nodes = <NodeItem>[];
   String kernelLog = '';
   String checkedAt = '';
+  String kernelVersion = '';
   bool kernelRunning = false;
   DateTime? lastRefresh;
 
@@ -78,6 +79,7 @@ class AppState extends ChangeNotifier {
       final r = await Native.stop();
       info = <String, dynamic>{...info, ...r};
       kernelRunning = false;
+      kernelVersion = '';
       status = KernelStatus.empty;
       notifyListeners();
     } catch (e) {
@@ -139,6 +141,10 @@ class AppState extends ChangeNotifier {
           checkedAt = (res['checkedAt'] ?? '') as String;
         }
         kernelLog = await Native.log(400);
+        if (kernelVersion.isEmpty) {
+          final v = await a.version();
+          if (v != null && v.isNotEmpty) kernelVersion = v;
+        }
       }
       lastRefresh = DateTime.now();
     } catch (e) {

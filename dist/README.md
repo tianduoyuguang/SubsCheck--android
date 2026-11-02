@@ -22,10 +22,18 @@ Windows 版 SubsCheck 依赖 proot / Termux 那套才能上安卓。本 App 换�
 
 | 包 | 适用 | SHA-256 |
 |---|---|---|
-| `SubsCheck-1.0.0-arm64-v8a.apk` | 2018 年之后绝大多数手机 | `3315b38b063e30a2336b3c38ed2db47fe2194e83313da43c835bd28a237a5a4a` |
-| `SubsCheck-1.0.0-armeabi-v7a.apk` | 老 32 位设备 | `bc9602edbb93adf1a5777411adef65598d08e0437c998c4b15069888f2e211f4` |
+| `SubsCheck-1.1.0-arm64-v8a.apk` | 2018 年之后绝大多数手机 | `d2ec594cd95f62d4003b66af558f9e92caecf4db56ad9347f7c26e1ce800f4a7` |
+| `SubsCheck-1.1.0-armeabi-v7a.apk` | 老 32 位设备 | `0aaac7a3097e8937a18f5eb9d2ae881a4c9788ade5fa311c71e4fbf64e68ebcd` |
 
-`minSdkVersion` = 24（Android 7.0），`targetSdkVersion` = 28，`versionName` = 1.0.0。
+`minSdkVersion` = 24（Android 7.0），`targetSdkVersion` = 28，`versionName` = 1.1.0。
+
+### 1.1.0 更新内容
+
+- 设置页新增 **免责声明**（软件性质 / 使用风险 / 数据与隐私 / 责任限制 / 开源许可）。
+- 设置页新增 **关于**：版本信息、运行信息（包名、构建号、设备、ABI、SDK、API Key）、相关链接。
+- 关于页支持 **检查更新**：读取 GitHub Release，自动按设备 ABI 选择安装包，可直连或走镜像下载并直接调起安装器。
+- 关于页可直接打开项目地址、内核地址、内核发布页、上游安卓部署说明与分流模板来源（失败时回落为系统分享）。
+- 修正内核版本号解析（新版内核 `/api/version` 返回 JSON）。
 校验：`sha256sum -c SHA256SUMS.txt`。
 
 安装时系统会提示「此应用专为旧版 Android 打造」，属正常现象（就是上面说的 targetSdk=28）。

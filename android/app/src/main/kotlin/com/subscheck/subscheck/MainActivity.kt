@@ -121,6 +121,20 @@ class MainActivity : FlutterActivity() {
                 mapOf("path" to f.absolutePath, "size" to f.length())
             }
 
+            "openUrl" -> {
+                val url = call.argument<String>("url") ?: ""
+                openExternally(url)
+            }
+
+            "downloadApk" -> {
+                val url = call.argument<String>("url") ?: ""
+                val name = call.argument<String>("name") ?: "subscheck-update.apk"
+                ApkDownloader.start(this, url, name)
+                ApkDownloader.status()
+            }
+
+            "downloadStatus" -> ApkDownloader.status()
+
             "notifyPermission" -> mapOf("granted" to hasNotificationPermission())
 
             "requestNotifyPermission" -> {
@@ -129,6 +143,35 @@ class MainActivity : FlutterActivity() {
             }
 
             else -> throw IllegalArgumentException("unknown method " + call.method)
+        }
+    }
+
+    /**
+     * 用系统浏览器打开链接。优先 ACTION_VIEW，个别 ROM 没有浏览器时退到 ACTION_SEND
+     * （用户可自行挑一个能处理 URL 的应用），都失败则回报给 Dart 侧提示。
+     */
+    private fun openExternally(rawUrl: String): Map<String, Any?> {
+        if (rawUrl.isEmpty()) return mapOf("ok" to false, "error" to "链接为空")
+        val uri = android.net.Uri.parse(rawUrl)
+        return try {
+            val view = Intent(Intent.ACTION_VIEW, uri).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(view)
+            mapOf("ok" to true)
+        } catch (e1: Exception) {
+            try {
+                val send = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, rawUrl)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(send)
+                mapOf("ok" to true)
+            } catch (e2: Exception) {
+                Log.w(TAG, "open url failed: " + e2.message)
+                mapOf("ok" to false, "error" to (e2.message ?: e2.toString()))
+            }
         }
     }
 

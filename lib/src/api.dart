@@ -138,11 +138,17 @@ class KernelApi {
     }
   }
 
+  /// 内核版本。新版内核返回 {"version":"v1.6.5"}，老版本返回纯文本。
   Future<String?> version() async {
     try {
       final r = await _get('/api/version');
       if (r.code != 200) return null;
-      return r.body.trim();
+      final body = r.body.trim();
+      try {
+        final v = jsonDecode(body);
+        if (v is Map && v['version'] != null) return v['version'].toString();
+      } catch (_) {}
+      return body;
     } catch (_) {
       return null;
     }

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../src/app_state.dart';
+import '../src/disclaimer.dart';
 import '../src/native.dart';
+import 'about.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key, required this.state});
@@ -94,6 +96,13 @@ class _SettingsPageState extends State<SettingsPage> {
   void _toast(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Future<void> _openAbout() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => AboutPage(state: widget.state)),
+    );
+    if (mounted) setState(() {});
   }
 
   @override
@@ -276,8 +285,19 @@ class _SettingsPageState extends State<SettingsPage> {
             children: <Widget>[
               ListTile(
                 leading: const Icon(Icons.info_outline),
-                title: const Text('SubsCheck for Android'),
-                subtitle: Text('v${info['versionName'] ?? '1.0.0'}  ·  内核 ${info['kernelVersion'] ?? widget.state.status.phase}'),
+                title: const Text('关于 SubsCheck'),
+                subtitle: Text(
+                    'v${info['versionName'] ?? '未知'}  ·  内核 ${widget.state.kernelVersion.isEmpty ? '未知' : widget.state.kernelVersion}'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: _openAbout,
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.report_gmailerrorred_outlined),
+                title: const Text('免责声明'),
+                subtitle: const Text('使用风险、数据说明与责任限制'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => showDisclaimerDialog(context),
               ),
               const Divider(height: 1),
               const ListTile(

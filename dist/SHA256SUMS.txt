@@ -1,2 +1,2 @@
-3315b38b063e30a2336b3c38ed2db47fe2194e83313da43c835bd28a237a5a4a *SubsCheck-1.0.0-arm64-v8a.apk
-bc9602edbb93adf1a5777411adef65598d08e0437c998c4b15069888f2e211f4 *SubsCheck-1.0.0-armeabi-v7a.apk
+d2ec594cd95f62d4003b66af558f9e92caecf4db56ad9347f7c26e1ce800f4a7 *SubsCheck-1.1.0-arm64-v8a.apk
+0aaac7a3097e8937a18f5eb9d2ae881a4c9788ade5fa311c71e4fbf64e68ebcd *SubsCheck-1.1.0-armeabi-v7a.apk

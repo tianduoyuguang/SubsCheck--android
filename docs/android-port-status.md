@@ -1,6 +1,6 @@
 # SubsCheck 安卓移植 — 进度与续做说明
 
-最后更新：2026-11-02 13:30
+最后更新：2026-11-02 22:35
 
 ## 一句话状态
 
@@ -12,15 +12,15 @@
 
 | 文件 | 大小 | SHA-256 | 说明 |
 |---|---|---|---|
-| `dist/SubsCheck-1.0.0-arm64-v8a.apk` | 34,214,062 B (32.6MB) | `3315b38b063e30a2336b3c38ed2db47fe2194e83313da43c835bd28a237a5a4a` | arm64 真机 |
-| `dist/SubsCheck-1.0.0-armeabi-v7a.apk` | 34,117,298 B (32.5MB) | `bc9602edbb93adf1a5777411adef65598d08e0437c998c4b15069888f2e211f4` | armv7 老机器 |
+| `dist/SubsCheck-1.1.0-arm64-v8a.apk` | 34,395,181 B (32.8MB) | `d2ec594cd95f62d4003b66af558f9e92caecf4db56ad9347f7c26e1ce800f4a7` | arm64 真机 |
+| `dist/SubsCheck-1.1.0-armeabi-v7a.apk` | 34,301,329 B (32.7MB) | `0aaac7a3097e8937a18f5eb9d2ae881a4c9788ade5fa311c71e4fbf64e68ebcd` | armv7 老机器 |
 | `dist/README.md` / `dist/SHA256SUMS.txt` | — | — | 安装说明与校验 |
 
 `build/app/outputs/flutter-apk/app-x86_64-release-test.apk`（36.5MB）只用于模拟器验证，**不要分发**。
 
 发布签名 keystore 不纳入版本控制。请使用自己的签名密钥进行分发构建。
 
-- minSdk 24 / targetSdk 28 / versionCode arm64=2001 armv7=1001 / versionName 1.0.0
+- minSdk 24 / targetSdk 28 / versionCode arm64=2002 armv7=1002 / versionName 1.1.0
 - 应用图标已换成自绘的蓝色圆角对勾（5 个 mipmap 密度全覆盖），启动器实测正常。
 
 ## 架构
@@ -84,6 +84,15 @@ export PATH=$JAVA_HOME/bin:$PATH
 - 5 个页面全部实拍确认：概览、节点（可搜索/排序/详情）、订阅、设置、日志。
 - 三个 UI 缺陷已修复：检测结束结果不刷新、日志 ANSI 乱码、内核 pid 显示成 App pid。
 - release 包 apksigner 校验通过（v2 scheme），aapt2 确认 targetSdk=28 / 单 ABI / 图标资源正确。
+
+### 1.1.0 新增功能验证（2026-11-02 22:30，MuMu x86_64 release 包）
+
+- 设置页底部「关于」卡三项：「关于 SubsCheck（v1.1.0 · 内核 X）」「免责声明」「开源协议」。
+- AboutPage：图标 + 版本号 + 内核版本/ABI、检查更新、相关链接、运行信息、许可，全部正常渲染。
+- 检查更新实测：直连 `api.github.com` 成功返回「已是最新版本（v1.0.0）· 通过 api.github.com 获取」；镜像链 `gh-proxy.com` / `ghfast.top` 作为回退。
+- 免责声明对话框五节全文可滚动、可关闭。
+- 「项目地址」点击 → Chrome 打开 `github.com/tianduoyuguang/SubsCheck--android`，加载正常。
+- `flutter analyze` → No issues found；`flutter test` → 2 passed。
 
 ## 待办
 

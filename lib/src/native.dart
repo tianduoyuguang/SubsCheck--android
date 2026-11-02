@@ -50,4 +50,17 @@ class Native {
     final r = await _call('requestNotifyPermission');
     return r['granted'] == true;
   }
+
+  /// 用系统浏览器打开链接（GitHub 在国内经常需要切浏览器/代理）。
+  static Future<bool> openUrl(String url) async {
+    final r = await _call('openUrl', <String, dynamic>{'url': url});
+    return r['ok'] == true;
+  }
+
+  /// 后台下载更新包到私有缓存，完成后自动唤起系统安装器。
+  static Future<Map<String, dynamic>> startDownload(String url, String fileName) =>
+      _call('downloadApk', <String, dynamic>{'url': url, 'name': fileName});
+
+  /// 轮询下载进度：downloading / percent / received / total / done / error / path。
+  static Future<Map<String, dynamic>> downloadStatus() => _call('downloadStatus');
 }
