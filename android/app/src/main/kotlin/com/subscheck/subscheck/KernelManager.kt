@@ -108,7 +108,15 @@ class KernelManager private constructor(ctx: Context) {
             "host" to listenHost,
             "abi" to Build.SUPPORTED_ABIS.firstOrNull(),
             "sdk" to Build.VERSION.SDK_INT,
-            "running" to isRunning()
+            "running" to isRunning(),
+            // 设置页/关于页要在 prepare 之后立刻显示版本号，
+            // 这里一并带上，免得它们回落到硬编码的默认值。
+            "versionName" to app.packageManager.getPackageInfo(app.packageName, 0).versionName,
+            "versionCode" to (if (Build.VERSION.SDK_INT >= 28)
+                app.packageManager.getPackageInfo(app.packageName, 0).longVersionCode
+            else app.packageManager.getPackageInfo(app.packageName, 0).versionCode.toLong()),
+            "packageName" to app.packageName,
+            "device" to (Build.MANUFACTURER + " " + Build.MODEL)
         )
     }
 
