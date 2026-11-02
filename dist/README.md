@@ -58,33 +58,14 @@ GET  /api/status /api/results /api/logs    ← 状态（需 X-API-Key）
 
 ## 从源码构建
 
-### 1. 交叉编译内核
+本仓库包含 Android App 源码，不包含 Go 检测内核的源码。内核上游位于
+[beck-8/subs-check](https://github.com/beck-8/subs-check)；当前 APK 使用的预编译内核已放在
+`android/app/src/main/jniLibs/`。
 
-需要 Go 1.25+（不需要 NDK、不需要 CGO）：
-
-```bash
-cd kernel
-CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -tags subscheck_slim -trimpath \
-  -ldflags "-s -w -X main.Version=android -X main.CurrentCommit=dev" \
-  -o ../kernel-build/slim/arm64.so .
-
-CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -tags subscheck_slim -trimpath \
-  -ldflags "-s -w -X main.Version=android -X main.CurrentCommit=dev" \
-  -o ../kernel-build/slim/armv7.so .
-```
-
-把产物复制到 `android/app/src/main/jniLibs/<abi>/libsubscheck.so`。
-
-`subscheck_slim` 构建标签会剔除内嵌的 Node 运行时与 Sub-Store bundle，
-内核体积从 112MB 降到 72MB（gzip 后约 24MB）。
-
-内核对上游的改动只有两个文件：
-- `kernel/android_support_linux.go` —— 补 Android 的 DNS（`/etc/resolv.conf` 不存在时回落到 223.5.5.5）与系统 CA 池
-- `kernel/assets/assets_slim.go` + 各 `assets_*.go` 的 build tag —— slim 构建支持
-
-### 2. 构建 APK
+安装 Flutter、Android SDK 和 JDK 后，在仓库根目录执行：
 
 ```bash
+flutter pub get
 flutter build apk --release --split-per-abi --target-platform android-arm,android-arm64
 ```
 
@@ -116,8 +97,8 @@ android/app/src/main/kotlin/com/subscheck/subscheck/
   KernelManager.kt       内核进程生命周期、配置 patch、日志缓冲
   KernelService.kt       前台服务（保活）
 assets/                  ACL4SSR 模板、config.yaml 模板
-kernel/                  内核源码（含 Android 补丁）
-kernel-build/slim/       预编译内核
+android/app/src/main/jniLibs/
+                         APK 内置的各 ABI 预编译内核
 docs/                    移植方案与进度记录
 ```
 

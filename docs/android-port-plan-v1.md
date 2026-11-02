@@ -1,5 +1,7 @@
 # SubsCheck 安卓移植方案 v1
 
+> 早期设计方案，仅作历史记录；实际实现与构建说明以仓库根目录的 [README](../README.md) 为准。
+
 > 基于你已确认的方向：**Flutter UI / armv7 / 给别人用（APK 分发）/ 不做 Windows 同步 / 不要 Sub-Store，App 自己导出 clash yaml**
 
 ---
@@ -182,7 +184,7 @@ return {
 | 后台被系统杀 | 测速跑到一半中断 | 前台服务 + WakeLock + 引导用户加电池白名单 |
 | 内核 `os.Exit(0)` | 配置缺失时静默退出，用户看到"启动失败" | 首次启动由 App 预写完整 config.yaml，绝不触发 createDefaultConfig |
 | 高并发测速耗电/发热 | 24 并发 × 20MB 下载 | UI 默认并发降到 8-10，给出提示 |
-| GPLv3 | 分发 APK 必须开源 | 仓库已放 LICENSE.txt；fork 的补丁要公开，构建脚本一并提交 |
+| GPLv3 | 分发 APK 必须开源 | 许可证见仓库根目录 `LICENSE`；遵守内核与依赖各自的许可证要求 |
 | armv7 设备性能 | 老设备测速慢 | 可选降级：直接给官方 Linux_armv7 release 二进制，不自编 |
 
 ---
