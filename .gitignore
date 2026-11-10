@@ -384,3 +384,10 @@ android/keystore/
 /kernel/
 kernel-build/
 kernel/vendor/
+
+# ===== 发布产物 =====
+# APK 不进仓库：体积大且每次发版都变，会在 Git 历史里永久累积。
+# 发布走 GitHub Releases，仓库内只保留校验文件 dist/SHA256SUMS.txt。
+/dist/*.apk
+/dist/*.aab
+/dist/*.zip
