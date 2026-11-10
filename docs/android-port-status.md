@@ -116,6 +116,27 @@ export PATH=$JAVA_HOME/bin:$PATH
 - 产物：`SubsCheck-1.2.0-arm64-v8a.apk`（34,427,929 B，sha256 `d159554e…284a`）、
   `SubsCheck-1.2.0-armeabi-v7a.apk`（34,342,529 B，sha256 `631a3a33…3303`），versionCode 3。
 
+## 仓库体积治理（2026-11-10）
+
+发版三轮后仓库膨胀到 580 MB，做了两步处理：
+
+1. **停止跟踪 APK**（`b622e64`）：`.gitignore` 增加 `/dist/*.apk`、`/dist/*.aab`、`/dist/*.zip`，
+   `git rm --cached` 掉两个安装包（磁盘文件保留），提交 `b622e64`，HEAD 跟踪体积 277 MB → 211 MB。
+2. **重写历史**（`199affd`）：用 `git filter-repo --invert-paths --path SubsCheck_Win_GUI/ --path-glob 'dist/*.apk'`，
+   只作用于 `master` + 三个 tag（`--refs master v1.0.0 v1.1.0 v1.2.0`），随后 `git reflog expire --expire=now --all` + `git gc --prune=now`。
+   - `.git` 580 MB → **235 MB**（本地），远端 bare 仓 `71.6 MiB`，全新 clone 的 `.git` 为 72 MB、含 212 MB 工作树。
+   - 清掉的历史：`SubsCheck_Win_GUI/` 171.1 MB、`dist/*.apk` 196.3 MB。
+   - **保留** `jniLibs/*/libsubscheck.so`（3 个 ABI 共约 221 MB，是运行时必需的内核二进制，无法外置）。
+   - 文件树完全一致：`HEAD^{tree}` 重写前后同为 `7685720b38df2867f007779bba0e128617e55c6c`。
+   - tag 指向变更：`v1.0.0` `a98c0ac`→`0709393`、`v1.1.0` `8841019`→`c32f6b9`、`v1.2.0` `06bebc1`→`489954f`（新建附注 tag，指向 `8ab2f1e` 重写后的等价 commit）。
+   - GitHub 上三个 Release 及其资产（各 3 个）**未受影响**，直链下载仍 302→200。
+   - 重写前完整备份：`D:\DeepSeek\Workspace\subscheck-backup-20261110-222426.bundle`（234 MB，`git bundle verify` 通过）。
+3. `6a2fe85`：README 与 dist/README 的安装段改为指向 Releases，并说明 APK 不入库的原因。
+
+发现但保留的现象：harness 自动生成的 `refs/agents/.../checkpoints/turn/{0..8}` 仍持有 WinGUI 的 blob（turn/0~4 树 449 MB），
+这些引用不在 `filter-repo` 的 `--refs` 范围内且被 `gc` 视为可达，因此本地 `.git` 仍是 235 MB 而非 20 MB。
+它们不参与 fetch/push（`refs/agents/*` 不随 clone 出来），对远端和协作者零影响；若将来要彻底清理，需先删掉这些 ref 再 gc。
+
 ## 待办
 
 1. **真机 ARM 验证**（唯一大缺口）。模拟器是 x86_64，ARM 内核在 MuMu 的 libhoudini 转译层下会触发 Go runtime `casgstatus` 断言崩溃 —— 这是模拟器限制，不是代码缺陷，但也意味着两个 ARM 包没在真实 ARM 设备上跑过。
