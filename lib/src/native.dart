@@ -91,6 +91,21 @@ class Native {
   static Future<Map<String, dynamic>> startDownload(String url, String fileName) =>
       _call('downloadApk', <String, dynamic>{'url': url, 'name': fileName});
 
-  /// 轮询下载进度：downloading / percent / received / total / done / error / path。
+  /// 轮询下载进度：downloading / percent / received / total / done / error / path /
+  /// needPermission / installing。
   static Future<Map<String, dynamic>> downloadStatus() => _call('downloadStatus');
+
+  /// 跳到系统「安装未知应用」授权页（Android 8.0+ 系统强制交互，App 不能代授权）。
+  /// 返回 ok（是否成功打开设置页）与 allowed（当前是否已允许）。
+  static Future<Map<String, dynamic>> requestInstallPermission() =>
+      _call('installPermission');
+
+  /// 当前是否已允许安装未知应用。
+  static Future<bool> installAllowed() async {
+    final r = await _call('installStatus');
+    return r['allowed'] == true;
+  }
+
+  /// 用户授权后立即续装这次下载的包；relaunched 表示是否真的重新拉起了安装器。
+  static Future<Map<String, dynamic>> installNow() => _call('installNow');
 }

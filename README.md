@@ -24,13 +24,25 @@ Windows 版 SubsCheck 依赖 proot / Termux 那套才能上安卓。本 App 换�
 
 | 包 | 适用 | SHA-256 |
 |---|---|---|
-| `SubsCheck-1.2.0-arm64-v8a.apk` | 2018 年之后绝大多数手机 | `d159554edadfb83b5014b413f02bdfec18575a995f9b6f54164cd20828d1484a` |
-| `SubsCheck-1.2.0-armeabi-v7a.apk` | 老 32 位设备 | `631a3a33821ab5695e38ead21c969f476df413c31902c519b8b943bd3bbf3303` |
+| `SubsCheck-1.2.1-arm64-v8a.apk` | 2018 年之后绝大多数手机 | `788fd01523d4a158c237d9b10ddfb95291d2eb12824c879a595d2f532e8cc81b` |
+| `SubsCheck-1.2.1-armeabi-v7a.apk` | 老 32 位设备 | `880696ba9bf9ed5dc3e611ffd096e19f512a083bfd8e327eed03194513ed17e3` |
 
-`minSdkVersion` = 24（Android 7.0），`targetSdkVersion` = 28，`versionName` = 1.2.0。
+`minSdkVersion` = 24（Android 7.0），`targetSdkVersion` = 28，`versionName` = 1.2.1。
 
 > APK 每次发版约 33 MB 且必然变化，提交进 Git 会让历史永久膨胀，
 > 因此仓库只保留源码与校验文件 `dist/SHA256SUMS.txt`，二进制一律走 Release。
+
+### 1.2.1 更新内容
+
+- **修复「更新下载完却装不上」**：应用此前没有声明 `REQUEST_INSTALL_PACKAGES`，Android 8.0+ 拉起系统安装器只会提示
+  「没有安装权限」，且没有任何去授权的入口。现在：
+  - 清单补上 `REQUEST_INSTALL_PACKAGES`；
+  - 关于页检测到缺少权限时，进度条下方出现「允许安装未知应用」与「我已允许，继续安装」两项；
+  - 点前者直达系统「安装未知应用」设置页（多级兜底，打不开会提示手动路径）；
+  - 授权后**自动继续安装**，不用重新下载 —— 既监听 `Activity.onResume`，也用 1.2 秒一次的轮询兜底，
+    覆盖「部分 ROM 把设置页开到另一个 display、本应用根本没被 pause」的情况；
+  - 拉起安装器前等 2 秒，避免刚返回前台时被系统任务栈恢复动作顶掉安装器窗口。
+- 下载完成的判定改为「先拉起安装器、再置完成标记」，Flutter 侧看到完成时权限状态必然已确定。
 
 ### 1.2.0 更新内容
 

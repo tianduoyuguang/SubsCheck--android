@@ -163,6 +163,32 @@ class MainActivity : FlutterActivity() {
 
             "downloadStatus" -> ApkDownloader.status()
 
+            // 「安装未知应用」授权：跳到系统设置页，或查询当前是否已允许。
+            // startActivity 必须回主线程，dispatch 是在工作线程池里跑的。
+            "installPermission" -> {
+                runOnUiThread {
+                    try {
+                        val out = ApkDownloader.requestPermission(this)
+                        runOnUiThread { channel?.invokeMethod("installPermissionOpened", out) }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "install permission: " + e.message)
+                    }
+                }
+                val out = HashMap<String, Any?>(ApkDownloader.status())
+                out["ok"] = true
+                out["allowed"] = ApkDownloader.isInstallAllowed(this)
+                out
+            }
+
+            "installStatus" -> mapOf("allowed" to ApkDownloader.isInstallAllowed(this))
+
+            "installNow" -> {
+                val ok = ApkDownloader.resumeIfPending(this)
+                val out = HashMap<String, Any?>(ApkDownloader.status())
+                out["relaunched"] = ok
+                out
+            }
+
             "notifyPermission" -> mapOf("granted" to hasNotificationPermission())
 
             "requestNotifyPermission" -> {
@@ -282,6 +308,21 @@ class MainActivity : FlutterActivity() {
             } catch (e: Exception) {
                 Log.w(TAG, "request permission: " + e.message)
             }
+        }
+    }
+
+    /**
+     * 用户可能去系统设置里开了「安装未知应用」再回来：此时自动续上被挡住的安装，
+     * 免得用户还要再点一次下载。App 从前台以外回到前台才会走到这里。
+     */
+    override fun onResume() {
+        super.onResume()
+        try {
+            if (ApkDownloader.resumeIfPending(this)) {
+                Log.i(TAG, "install resumed after permission return")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "resume install: " + e.message)
         }
     }
 

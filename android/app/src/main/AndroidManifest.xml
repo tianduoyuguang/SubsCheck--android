@@ -5,6 +5,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Android 8.0+ 拉起系统安装器必须先有「安装未知应用」权限，否则只能弹「没有安装权限」。
+         用户仍需在系统设置里手动允许一次（这是 Google 的强制交互，App 不能代为授权）。 -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- 仅在 Android 9 及以下才需要直写公共 Download；Android 10+ 走 MediaStore，无需权限 -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="28" />

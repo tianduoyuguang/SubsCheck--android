@@ -23,7 +23,16 @@ class _AboutPageState extends State<AboutPage> {
   String _downloadMsg = '';
   double _progress = 0;
   bool _downloading = false;
+  /// 包已下载完，只差系统「安装未知应用」授权。
+  bool _needInstallPermission = false;
   Timer? _poll;
+
+  /// 等待用户去系统设置授权期间的轮询。
+  ///
+  /// 不能只依赖 Activity.onResume：部分 ROM / 多显示器环境下系统设置页会在
+  /// 另一个 display 上打开，本 App 的 Activity 根本没被 pause，也就收不到
+  /// resume 回调。轮询权限状态对两种情况都成立。
+  Timer? _permPoll;
 
   String get _currentVersion => (widget.state.info['versionName'] ?? '未知').toString();
 
@@ -36,7 +45,32 @@ class _AboutPageState extends State<AboutPage> {
   @override
   void dispose() {
     _poll?.cancel();
+    _permPoll?.cancel();
     super.dispose();
+  }
+
+  /// 卡在「安装未知应用」授权上时，反复问一次系统当前是否已允许。
+  ///
+  /// 一旦允许就自动续装，用户不需要回来再点「我已允许，继续安装」。
+  void _startPermWatch() {
+    if (_permPoll != null) return;
+    _permPoll = Timer.periodic(const Duration(milliseconds: 1200), (_) async {
+      final allowed = await Native.installAllowed();
+      if (!mounted) {
+        _permPoll?.cancel();
+        _permPoll = null;
+        return;
+      }
+      if (!allowed) return;
+      _permPoll?.cancel();
+      _permPoll = null;
+      // 等一拍再拉起安装器。刚从系统设置返回时，系统会把本 App 的任务栈
+      // 重新置于前台；若此时立刻 startActivity，安装器会先弹出来又被压到
+      // 后面，用户看到的还是 App 自己的页面（模拟器 logcat 实测差 1.5s）。
+      await Future<void>.delayed(const Duration(milliseconds: 2000));
+      if (!mounted) return;
+      if (_needInstallPermission) await _installNow();
+    });
   }
 
   Future<void> _check({bool silent = false}) async {
@@ -86,8 +120,11 @@ class _AboutPageState extends State<AboutPage> {
       _toast('下载启动失败：${r['error'] ?? '未知原因'}');
       return;
     }
+    _permPoll?.cancel();
+    _permPoll = null;
     setState(() {
       _downloading = true;
+      _needInstallPermission = false;
       _progress = 0;
       _downloadMsg = '正在下载 ${asset.name}';
     });
@@ -108,10 +145,22 @@ class _AboutPageState extends State<AboutPage> {
         _downloadMsg = '正在下载 ${(received / 1048576).toStringAsFixed(1)} MB';
       }
     });
-    if (done) {
+    final needPerm = s['needPermission'] == true;
+    if (done && needPerm) {
+      // 装完系统才允许安装：不再轮询下载进度，改成等用户去授权。
       _poll?.cancel();
       setState(() {
         _downloading = false;
+        _needInstallPermission = true;
+        _progress = 1;
+        _downloadMsg = '安装包已下载，还需允许「安装未知应用」';
+      });
+      _startPermWatch();
+    } else if (done) {
+      _poll?.cancel();
+      setState(() {
+        _downloading = false;
+        _needInstallPermission = false;
         _downloadMsg = '下载完成，请在弹出的安装器中确认';
       });
       _toast('下载完成');
@@ -122,6 +171,42 @@ class _AboutPageState extends State<AboutPage> {
         _downloadMsg = '下载失败：$err';
       });
     }
+  }
+
+  /// 跳到系统「安装未知应用」页。授权后系统会回到 App，onResume 里会自动续装；
+  /// 若用户其实已经开好了开关，这里直接续装。
+  Future<void> _grantInstallPermission() async {
+    final r = await Native.requestInstallPermission();
+    if (!mounted) return;
+    if (r['allowed'] == true) {
+      await _installNow();
+      return;
+    }
+    if (r['ok'] != true) {
+      _toast('没找到系统设置页，请到「设置 → 应用 → 特殊权限 → 安装未知应用」里手动允许');
+      return;
+    }
+    _toast('请在系统页面允许「安装未知应用」，返回后会自动继续安装');
+  }
+
+  Future<void> _installNow() async {
+    final r = await Native.installNow();
+    if (!mounted) return;
+    if (r['relaunched'] == true) {
+      _permPoll?.cancel();
+      _permPoll = null;
+      setState(() {
+        _needInstallPermission = false;
+        _downloadMsg = '已拉起安装器，请确认安装';
+      });
+      return;
+    }
+    if (r['allowed'] != true) {
+      _toast('还没有允许「安装未知应用」');
+      return;
+    }
+    _toast('安装包已失效，请重新下载');
+    setState(() => _needInstallPermission = false);
   }
 
   @override
@@ -186,6 +271,24 @@ class _AboutPageState extends State<AboutPage> {
                         Text(_downloadMsg, style: const TextStyle(fontSize: 12)),
                       ],
                     ),
+                  ),
+                ],
+                // 包已下载完，只差系统「安装未知应用」授权：给出直达入口，
+                // 不再让用户面对一句「没有安装权限」不知所措。
+                if (_needInstallPermission && !_downloading) ...<Widget>[
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: Icon(Icons.shield_outlined, color: scheme.error),
+                    title: const Text('允许安装未知应用'),
+                    subtitle: const Text('系统要求手动开启一次；返回本应用后会自动继续安装'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: _grantInstallPermission,
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.refresh),
+                    title: const Text('我已允许，继续安装'),
+                    onTap: _installNow,
                   ),
                 ],
                 if (u != null && u.ok && u.hasUpdate && asset != null) ...<Widget>[

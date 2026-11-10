@@ -116,6 +116,39 @@ export PATH=$JAVA_HOME/bin:$PATH
 - 产物：`SubsCheck-1.2.0-arm64-v8a.apk`（34,427,929 B，sha256 `d159554e…284a`）、
   `SubsCheck-1.2.0-armeabi-v7a.apk`（34,342,529 B，sha256 `631a3a33…3303`），versionCode 3。
 
+### 1.2.1：修复自动更新无法安装（2026-11-10，MuMu x86_64 release 包）
+
+需求来自「app 自带的更新下载完成后显示没有安装权限导致更新不了」。
+
+- **根因**：`AndroidManifest.xml` 从未声明 `REQUEST_INSTALL_PACKAGES`。Android 8.0+ 拉起系统安装器必须先有该权限，
+  旧 `ApkDownloader.install()` 直接 `startActivity(ACTION_VIEW)` 且无任何判断与兜底，用户也没有去授权的入口。
+  证据：`cmd appops get com.subscheck.subscheck REQUEST_INSTALL_PACKAGES` → `No operations. Default mode: default`；
+  系统权限页 `GrantPermissionsViewModel` 里根本没有该项可申请。
+  另注意：该机器 `appops` 命令不可用（`inaccessible or not found`），必须用 `cmd appops`。
+- 清单补 `REQUEST_INSTALL_PACKAGES`；`ApkDownloader` 新增 `isInstallAllowed()`（`canRequestPackageInstalls()`，SDK<26 恒 true）、
+  `openInstallSettings()`（`ACTION_MANAGE_UNKNOWN_APP_SOURCES` + `package:` uri → 无 uri 版本 → `ACTION_APPLICATION_DETAILS_SETTINGS` 三级兜底）、
+  `resumeIfPending()`、`requestPermission()`；`install()` 开头加权限闸门并置 `needPermission` 状态；
+  `run()` 改为**先 install 再置 done**，保证 Flutter 看到 done 时权限状态已确定。
+- `MainActivity` 新增 `installPermission` / `installStatus` / `installNow` 三个 channel 方法（`startActivity` 必须包 `runOnUiThread`，
+  因为 dispatch 跑在工作线程池），并 override `onResume()` 调 `resumeIfPending`。
+- 关于页：`_tickDownload` 在 `done && needPermission` 时停止轮询并显示两张卡片「允许安装未知应用」「我已允许，继续安装」。
+- **为什么不能只靠 onResume**：MuMu 会把系统设置页开到另一个虚拟 display（实测 Display #12，本 App 在 #11），
+  App 的 Activity 从未被 pause，`onResume` 永不触发。修法：`_startPermWatch()` 用 `Timer.periodic(1200ms)` 轮询
+  `Native.installAllowed()`，授权后自动续装；`_permPoll` 幂等、在 `dispose`/重新下载/拉起成功后取消。
+- **为什么要等 2 秒**：抢在系统恢复任务栈之前拉安装器会看到
+  `ActivityTaskManager: [KeepAlive] startActivityFromRecents 9:Task{... MainActivity}`，
+  系统把刚弹出的安装器压回去、把 App 拉回前台。加 `Future.delayed(2000ms)` 后日志变为
+  `[KeepAlive] reused display 7 for pkg com.android.packageinstaller`，安装器正常留在前台。
+- **验证教训**：验证自更新必须让测试包的 `versionCode` **小于**目标包。首次用 `--build-number=90` 打测试包去升级
+  versionCode=3 的 1.2.0，被系统按降级拒绝：`PackageInstallerSession: Failed to verify session ... [INSTALL_FAILED_VERSION_DOWNGRADE]`。
+  改用 `--build-number=2` 即通过。
+- 端到端实测（1.1.9(2) → 1.2.0(3)）：下载 34,427,929 B 完成 → `SubsCheckDownload: install blocked: REQUEST_INSTALL_PACKAGES not granted`
+  → 点「允许安装未知应用」→ 系统设置开在 Display #12 → 开关 (2450,660) → `REQUEST_INSTALL_PACKAGES: allow`
+  → 返回后日志 `install permission granted, resuming install` → 安装器 → 「更新」→ `InstallSuccess`「已安装应用。」
+- `flutter analyze` → No issues found；`flutter test` → 2 passed。
+- 产物：`SubsCheck-1.2.1-arm64-v8a.apk`（34,433,021 B，sha256 `788fd015…c81b`）、
+  `SubsCheck-1.2.1-armeabi-v7a.apk`（34,348,441 B，sha256 `880696ba…17e3`），versionCode 4。
+
 ## 仓库体积治理（2026-11-10）
 
 发版三轮后仓库膨胀到 580 MB，做了两步处理：
