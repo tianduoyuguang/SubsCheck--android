@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../src/app_state.dart';
+import '../src/export_dir.dart';
 import '../src/exporter.dart';
 import '../src/native.dart';
 
@@ -51,6 +52,7 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
       final name = full ? 'mihomo.yaml' : 'proxies.yaml';
       final r = await Native.saveExport(name, content);
       final path = (r['path'] ?? '') as String;
+      widget.state.applyExportInfo(r);
       setState(() {
         lastPath = path;
         nodeCount = Exporter.countProxies(Exporter.proxiesBlock(all));
@@ -171,7 +173,20 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
             child: ListTile(
               leading: const Icon(Icons.folder_open),
               title: const Text('导出文件位置'),
-              subtitle: SelectableText((widget.state.info['outputDir'] ?? '').toString()),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(widget.state.exportLabel,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 2),
+                  SelectableText(widget.state.exportPath, style: const TextStyle(fontSize: 11)),
+                ],
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () async {
+                await showExportDirSheet(context, widget.state);
+                if (mounted) setState(() {});
+              },
             ),
           ),
         ],

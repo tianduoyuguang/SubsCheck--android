@@ -19,6 +19,8 @@ class MainActivity : FlutterActivity() {
         private const val TAG = "SubsCheckMain"
         private const val CHANNEL = "subscheck/native"
         private const val REQ_NOTIF = 9001
+        private const val REQ_STORAGE = 9002
+        const val REQ_TREE = 9003
     }
 
     private val pool = Executors.newSingleThreadExecutor { r ->
@@ -26,13 +28,14 @@ class MainActivity : FlutterActivity() {
     }
 
     private var pending: MethodChannel.Result? = null
+    private var channel: MethodChannel? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         val km = KernelManager.get(this)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
-            runAsync(call, result)
-        }
+        val ch = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+        ch.setMethodCallHandler { call, result -> runAsync(call, result) }
+        channel = ch
     }
 
     private fun runAsync(call: MethodCall, result: MethodChannel.Result) {
@@ -117,8 +120,33 @@ class MainActivity : FlutterActivity() {
             "saveExport" -> {
                 val name = call.argument<String>("name") ?: "export.yaml"
                 val content = call.argument<String>("content") ?: ""
-                val f = km.saveExport(name, content)
-                mapOf("path" to f.absolutePath, "size" to f.length())
+                km.saveExport(name, content)
+            }
+
+            "exportInfo" -> ExportStore.info(this)
+
+            "setExportMode" -> {
+                val mode = call.argument<String>("mode") ?: ExportStore.MODE_PRIVATE
+                ExportStore.setMode(this, mode)
+                if (mode == ExportStore.MODE_DOWNLOAD) requestStoragePermissionIfNeeded()
+                ExportStore.info(this)
+            }
+
+            "setExportTree" -> {
+                val raw = call.argument<String>("uri") ?: ""
+                if (raw.isNotEmpty()) ExportStore.setTree(this, android.net.Uri.parse(raw))
+                ExportStore.info(this)
+            }
+
+            "pickExportDir" -> {
+                runOnUiThread { launchTreePicker() }
+                mapOf("ok" to true)
+            }
+
+            "clearExportTree" -> {
+                ExportStore.setTree(this, android.net.Uri.parse(""))
+                ExportStore.setMode(this, ExportStore.MODE_PRIVATE)
+                ExportStore.info(this)
             }
 
             "openUrl" -> {
@@ -173,6 +201,71 @@ class MainActivity : FlutterActivity() {
                 mapOf("ok" to false, "error" to (e2.message ?: e2.toString()))
             }
         }
+    }
+
+    private fun launchTreePicker() {
+        try {
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+                addFlags(
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+                        Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or
+                        Intent.FLAG_GRANT_PREFIX_URI_PERMISSION
+                )
+            }
+            startActivityForResult(intent, REQ_TREE)
+        } catch (e: Exception) {
+            Log.w(TAG, "launch tree picker: " + e.message)
+            // 个别 ROM 没有 DocumentsUI，退回到公共 Download 目录
+            ExportStore.setMode(this, ExportStore.MODE_DOWNLOAD)
+            runOnUiThread { channel?.invokeMethod("exportDirChanged", ExportStore.info(this)) }
+        }
+    }
+
+    private fun requestStoragePermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < 23) return
+        if (ExportStore.hasStoragePermission(this)) return
+        runOnUiThread {
+            try {
+                requestPermissions(
+                    arrayOf(
+                        Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                        Manifest.permission.READ_EXTERNAL_STORAGE
+                    ), REQ_STORAGE
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "request storage permission: " + e.message)
+            }
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQ_STORAGE) {
+            val granted = ExportStore.hasStoragePermission(this)
+            Log.i(TAG, "storage permission granted=" + granted)
+        }
+    }
+
+    /**
+     * 处理系统文件夹选择器（SAF）返回的目录。用户取消时 treeUri 为空，
+     * 此时保持原设置不动，避免把已选目录清掉。
+     */
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQ_TREE) return
+        val uri = data?.data
+        if (resultCode != RESULT_OK || uri == null) return
+        try {
+            contentResolver.takePersistableUriPermission(
+                uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "takePersistableUriPermission: " + e.message)
+        }
+        ExportStore.setTree(this, uri)
+        Log.i(TAG, "export dir -> " + ExportStore.displayPath(this))
+        channel?.invokeMethod("exportDirChanged", ExportStore.info(this))
     }
 
     private fun hasNotificationPermission(): Boolean {

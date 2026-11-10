@@ -94,6 +94,28 @@ export PATH=$JAVA_HOME/bin:$PATH
 - 「项目地址」点击 → Chrome 打开 `github.com/tianduoyuguang/SubsCheck--android`，加载正常。
 - `flutter analyze` → No issues found；`flutter test` → 2 passed。
 
+### 1.2.0：导出目录可配置（2026-11-10，MuMu x86_64 release 包）
+
+需求来自「app 的导出文件位置不能修改」，选定方案 A：设置页里可选目录。
+
+- 三种模式：应用私有目录 / 手机 `Download/SubsCheck` / SAF 自选目录，选择持久化，重启 App 保持。
+- **关键坑：Android 10+ 拿不到 `WRITE_EXTERNAL_STORAGE`。** 原先 `ExportStore.hasStoragePermission` 直接查该权限，
+  但清单里它带 `maxSdkVersion="28"`，在 SDK 32 上请求必然落空，弹窗里出现红字「需要授予存储权限后才能写入」且文件不落盘。
+  logcat 佐证：`SubsCheckMain: storage permission granted=false`，
+  `GrantPermissionsViewModel: None of [WRITE_EXTERNAL_STORAGE, READ_EXTERNAL_STORAGE, ACCESS_MEDIA_LOCATION] in {}`。
+  修法：`SDK_INT >= 29` 一律视为有权限（走 MediaStore 不需要权限）；Download 落盘改用
+  `MediaStore.Downloads.getContentUri(VOLUME_EXTERNAL_PRIMARY)` + `RELATIVE_PATH="Download/SubsCheck"`，
+  先按 DISPLAY_NAME 查同名再 `update` 复用，实现覆盖写而不产生 `proxies.yaml (1)`；`IS_PENDING` 前后置位。
+  同时从清单删掉 `MANAGE_EXTERNAL_STORAGE` 与 `xmlns:tools`。
+- SAF：`ACTION_OPEN_DOCUMENT_TREE` + `takePersistableUriPermission`，回推 `exportDirChanged` 事件。
+- 另一个缺陷：`lib/src/export_dir.dart` 的 `_ExportDirSheet` 不监听 `AppState`，SAF 返回后外层卡片已更新但弹窗内
+  单选项与「当前导出到」仍是旧值，需关掉重开才刷新。修法：`build` 改为 `ListenableBuilder(listenable: s, builder: ...)`
+  包住原 body（抽成 `_buildBody`）。
+- 实测（2560x1440，MuMu）：Download 模式导出 `proxies.yaml` 261 B，重复导出仍是同一文件；SAF 选 Documents 后
+  外层与弹窗内均显示 `/storage/emulated/0/Documents`，重启 App 保持。`flutter analyze` → No issues found。
+- 产物：`SubsCheck-1.2.0-arm64-v8a.apk`（34,427,929 B，sha256 `d159554e…284a`）、
+  `SubsCheck-1.2.0-armeabi-v7a.apk`（34,342,529 B，sha256 `631a3a33…3303`），versionCode 3。
+
 ## 待办
 
 1. **真机 ARM 验证**（唯一大缺口）。模拟器是 x86_64，ARM 内核在 MuMu 的 libhoudini 转译层下会触发 Go runtime `casgstatus` 断言崩溃 —— 这是模拟器限制，不是代码缺陷，但也意味着两个 ARM 包没在真实 ARM 设备上跑过。

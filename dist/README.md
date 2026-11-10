@@ -22,10 +22,20 @@ Windows 版 SubsCheck 依赖 proot / Termux 那套才能上安卓。本 App 换�
 
 | 包 | 适用 | SHA-256 |
 |---|---|---|
-| `SubsCheck-1.1.0-arm64-v8a.apk` | 2018 年之后绝大多数手机 | `d2ec594cd95f62d4003b66af558f9e92caecf4db56ad9347f7c26e1ce800f4a7` |
-| `SubsCheck-1.1.0-armeabi-v7a.apk` | 老 32 位设备 | `0aaac7a3097e8937a18f5eb9d2ae881a4c9788ade5fa311c71e4fbf64e68ebcd` |
+| `SubsCheck-1.2.0-arm64-v8a.apk` | 2018 年之后绝大多数手机 | `d159554edadfb83b5014b413f02bdfec18575a995f9b6f54164cd20828d1484a` |
+| `SubsCheck-1.2.0-armeabi-v7a.apk` | 老 32 位设备 | `631a3a33821ab5695e38ead21c969f476df413c31902c519b8b943bd3bbf3303` |
 
-`minSdkVersion` = 24（Android 7.0），`targetSdkVersion` = 28，`versionName` = 1.1.0。
+`minSdkVersion` = 24（Android 7.0），`targetSdkVersion` = 28，`versionName` = 1.2.0。
+
+### 1.2.0 更新内容
+
+- 新增 **导出目录可选**（设置 → 导出文件 → 导出目录）：
+  - **应用私有目录**：`Android/data/com.subscheck.subscheck/files/exports/`，卸载即清理。
+  - **手机 Download/SubsCheck**：走 MediaStore 写入公共下载目录，**无需任何存储权限**（Android 10+），
+    卸载后文件保留，重复导出覆盖同名文件而不是生成 `xxx (1).yaml`。
+  - **自定义目录**：调系统文件夹选择器（SAF）任选一个目录，授权持久化保存；可随时「清除自定义目录」。
+- 修正导出目录弹窗不随选择即时刷新的问题（系统选择器返回后原地更新单选项与「当前导出到」）。
+- 移除 `MANAGE_EXTERNAL_STORAGE` 等不再需要的存储权限声明。
 
 ### 1.1.0 更新内容
 
@@ -47,7 +57,8 @@ Windows 版 SubsCheck 依赖 proot / Termux 那套才能上安卓。本 App 换�
 4. 「订阅」页导出：
    - **完整 mihomo 配置**：proxies + proxy-groups + rule-providers + rules（内置 ACL4SSR 模板）
    - **仅节点**：只有 proxies
-   导出文件写到 `Android/data/com.subscheck.subscheck/files/exports/`，可直接分享给其他设备/clash 客户端。
+   导出位置由「设置 → 导出文件 → 导出目录」决定，默认 `Android/data/com.subscheck.subscheck/files/exports/`；
+   可改成公共 `Download/SubsCheck` 或任意自选目录。导出后可直接分享给其他设备/clash 客户端。
 5. 「设置」里可以：
    - 改监听地址与端口（默认 `127.0.0.1:8199`）
    - 直接编辑 `config.yaml`（订阅源、并发、超时、测速阈值等都在这里）
@@ -100,11 +111,13 @@ lib/                     Flutter UI
   src/api.dart           内核 HTTP 客户端
   src/app_state.dart     全局状态与 2 秒轮询
   src/exporter.dart      拼接完整 mihomo 配置
+  src/export_dir.dart    导出目录选择（私有 / Download / SAF）
   src/native.dart        MethodChannel 桥
   pages/                 概览/节点/订阅/设置/日志
 android/app/src/main/kotlin/com/subscheck/subscheck/
   KernelManager.kt       内核进程生命周期、配置 patch、日志缓冲
   KernelService.kt       前台服务（保活）
+  ExportStore.kt         导出落盘（MediaStore / SAF / 私有目录）
 assets/                  ACL4SSR 模板、config.yaml 模板
 android/app/src/main/jniLibs/
                          APK 内置的各 ABI 预编译内核

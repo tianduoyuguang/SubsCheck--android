@@ -117,7 +117,7 @@ class KernelManager private constructor(ctx: Context) {
             else app.packageManager.getPackageInfo(app.packageName, 0).versionCode.toLong()),
             "packageName" to app.packageName,
             "device" to (Build.MANUFACTURER + " " + Build.MODEL)
-        )
+        ) + ExportStore.info(app)
     }
 
     /** 强制重写配置（用户改了输出目录/端口/密钥后调） */
@@ -335,14 +335,16 @@ class KernelManager private constructor(ctx: Context) {
         return start()
     }
 
-    /** 导出文件写到外部私有目录，方便用户通过分享/文件管理器取走 */
-    fun saveExport(name: String, content: String): File {
-        val root = app.getExternalFilesDir(null) ?: File(app.filesDir, "export")
-        val dir = File(root, "exports")
-        dir.mkdirs()
-        val target = File(dir, name)
-        target.writeText(content)
-        return target
+    /** 导出文件写到用户选定的目录（私有 / 公共 Download / SAF 自选） */
+    fun saveExport(name: String, content: String): Map<String, Any?> {
+        val saved = ExportStore.save(app, name, content)
+        return mapOf(
+            "path" to saved.path,
+            "size" to saved.size,
+            "exportMode" to ExportStore.mode(app),
+            "exportLabel" to ExportStore.label(app),
+            "exportPath" to ExportStore.displayPath(app)
+        )
     }
 
     fun clearResults() {
@@ -384,7 +386,7 @@ class KernelManager private constructor(ctx: Context) {
             "apiKey" to apiKey,
             "running" to isRunning(),
             "pid" to pid()
-        )
+        ) + ExportStore.info(app)
     }
 
     fun startForegroundService() {

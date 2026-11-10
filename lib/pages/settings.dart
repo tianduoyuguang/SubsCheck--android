@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../src/app_state.dart';
 import '../src/disclaimer.dart';
+import '../src/export_dir.dart';
 import '../src/native.dart';
 import 'about.dart';
 
@@ -207,6 +208,28 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ],
             ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text('导出文件', style: Theme.of(context).textTheme.titleMedium),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.save_alt),
+            title: const Text('导出目录'),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(widget.state.exportLabel,
+                    style: Theme.of(context).textTheme.bodyMedium),
+                const SizedBox(height: 2),
+                SelectableText(widget.state.exportPath, style: const TextStyle(fontSize: 11)),
+              ],
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () async {
+              await showExportDirSheet(context, widget.state);
+              if (mounted) setState(() {});
+            },
           ),
         ),
         const SizedBox(height: 16),

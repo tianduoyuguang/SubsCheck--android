@@ -41,6 +41,36 @@ class Native {
   static Future<Map<String, dynamic>> saveExport(String name, String content) =>
       _call('saveExport', <String, dynamic>{'name': name, 'content': content});
 
+  /// 当前导出目录配置：mode / label / path / privatePath / downloadPath /
+  /// hasTree / storageGranted / needsPermission。
+  static Future<Map<String, dynamic>> exportInfo() => _call('exportInfo');
+
+  static Future<Map<String, dynamic>> setExportMode(String mode) =>
+      _call('setExportMode', <String, dynamic>{'mode': mode});
+
+  static Future<Map<String, dynamic>> setExportTree(String uri) =>
+      _call('setExportTree', <String, dynamic>{'uri': uri});
+
+  static Future<Map<String, dynamic>> clearExportTree() => _call('clearExportTree');
+
+  /// 拉起系统文件夹选择器（SAF）。结果通过 [exportDirEvents] 回调。
+  static Future<void> pickExportDir() async {
+    await _call('pickExportDir');
+  }
+
+  /// 目录选择完成后 Kotlin 侧主动推送。
+  static void bindExportDirEvents(void Function(Map<String, dynamic> info) onChanged) {
+    _ch.setMethodCallHandler((MethodCall call) async {
+      if (call.method == 'exportDirChanged') {
+        final raw = call.arguments;
+        if (raw is Map) {
+          onChanged(raw.map((k, v) => MapEntry(k.toString(), v)));
+        }
+      }
+      return null;
+    });
+  }
+
   static Future<bool> hasNotificationPermission() async {
     final r = await _call('notifyPermission');
     return r['granted'] == true;

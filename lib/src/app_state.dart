@@ -29,6 +29,17 @@ class AppState extends ChangeNotifier {
   String get configPath => (info['configPath'] ?? '') as String;
   String get outputDir => (info['outputDir'] ?? '') as String;
 
+  /// App 导出文件当前写到哪（用户可在设置里改）。
+  String get exportPath => (info['exportPath'] ?? '') as String;
+  String get exportLabel => (info['exportLabel'] ?? '应用私有目录') as String;
+
+  /// 目录选择完成后（Kotlin 回推 / 用户点选）刷新本机信息。
+  void applyExportInfo(Map<String, dynamic> patch) {
+    if (patch.isEmpty) return;
+    info = <String, dynamic>{...info, ...patch};
+    notifyListeners();
+  }
+
   Future<void> initialize() async {
     busy = true;
     error = null;
@@ -43,6 +54,8 @@ class AppState extends ChangeNotifier {
         apiKey: (prepared['apiKey'] ?? '') as String,
       );
       kernelRunning = prepared['running'] == true;
+      // 系统文件夹选择器返回后由 Kotlin 主动回推，避免 Dart 侧轮询等结果。
+      Native.bindExportDirEvents(applyExportInfo);
       ready = true;
       _startPolling();
       await refresh();
