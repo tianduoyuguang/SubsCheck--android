@@ -20,12 +20,17 @@ Windows 版 SubsCheck 依赖 proot / Termux 那套才能上安卓。本 App 换�
 
 ## 安装
 
+安装包**不在仓库里**，请到 [Releases](https://github.com/tianduoyuguang/SubsCheck--android/releases) 下载：
+
 | 包 | 适用 | SHA-256 |
 |---|---|---|
 | `SubsCheck-1.2.0-arm64-v8a.apk` | 2018 年之后绝大多数手机 | `d159554edadfb83b5014b413f02bdfec18575a995f9b6f54164cd20828d1484a` |
 | `SubsCheck-1.2.0-armeabi-v7a.apk` | 老 32 位设备 | `631a3a33821ab5695e38ead21c969f476df413c31902c519b8b943bd3bbf3303` |
 
 `minSdkVersion` = 24（Android 7.0），`targetSdkVersion` = 28，`versionName` = 1.2.0。
+
+> APK 每次发版约 33 MB 且必然变化，提交进 Git 会让历史永久膨胀，
+> 因此仓库只保留源码与校验文件 `dist/SHA256SUMS.txt`，二进制一律走 Release。
 
 ### 1.2.0 更新内容
 
