@@ -29,6 +29,12 @@ Windows 版 SubsCheck 依赖 proot / Termux 那套才能上安卓。本 App 换�
 
 `minSdkVersion` = 24（Android 7.0），`targetSdkVersion` = 28，`versionName` = 1.2.4。
 
+> **安装时提示「未经验证的开发者 / 无开发者认证」是正常的，直接继续安装即可。**
+> 系统从 Android 16 QPR2 起内置了开发者身份校验，会核对包名是否登记过开发者身份。
+> 本项目是个人开源发布，没有登记，所以每次装新版本都会提示一次 —— 这不代表安装包损坏或被篡改。
+> 校验安装包请比对上面的 SHA-256，或运行 `sha256sum -c dist/SHA256SUMS.txt`。
+> 如果不想看到这个提示，可以用 `adb install -r <apk>` 安装（官方保留的开发/测试通道，不受该提示影响）。
+
 > APK 每次发版约 33 MB 且必然变化，提交进 Git 会让历史永久膨胀，
 > 因此仓库只保留源码与校验文件 `dist/SHA256SUMS.txt`，二进制一律走 Release。
 
