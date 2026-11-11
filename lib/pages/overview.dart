@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../src/app_state.dart';
+import '../src/export_dir.dart';
 
 class OverviewPage extends StatelessWidget {
   const OverviewPage({super.key, required this.state});
@@ -151,10 +152,29 @@ class OverviewPage extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Card(
-            child: ListTile(
-              leading: const Icon(Icons.folder_outlined),
-              title: const Text('输出目录'),
-              subtitle: Text(state.outputDir, style: Theme.of(context).textTheme.bodySmall),
+            child: Column(
+              children: <Widget>[
+                ListTile(
+                  leading: const Icon(Icons.folder_outlined),
+                  title: const Text('导出目录'),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(state.exportLabel, style: Theme.of(context).textTheme.bodyMedium),
+                      const SizedBox(height: 2),
+                      Text(state.exportPath, style: const TextStyle(fontSize: 11)),
+                    ],
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => showExportDirSheet(context, state),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.storage_outlined),
+                  title: const Text('内核数据目录'),
+                  subtitle: Text(state.outputDir, style: Theme.of(context).textTheme.bodySmall),
+                ),
+              ],
             ),
           ),
         ],

@@ -24,13 +24,21 @@ Windows 版 SubsCheck 依赖 proot / Termux 那套才能上安卓。本 App 换�
 
 | 包 | 适用 | SHA-256 |
 |---|---|---|
-| `SubsCheck-1.2.1-arm64-v8a.apk` | 2018 年之后绝大多数手机 | `788fd01523d4a158c237d9b10ddfb95291d2eb12824c879a595d2f532e8cc81b` |
-| `SubsCheck-1.2.1-armeabi-v7a.apk` | 老 32 位设备 | `880696ba9bf9ed5dc3e611ffd096e19f512a083bfd8e327eed03194513ed17e3` |
+| `SubsCheck-1.2.2-arm64-v8a.apk` | 2018 年之后绝大多数手机 | `5fb440c6f5c6a99750454a799b5e11e91700731ea555a57282eba6ca6a6f8c73` |
+| `SubsCheck-1.2.2-armeabi-v7a.apk` | 老 32 位设备 | `d9d5bb83b9ec2ef1d8e3943124b94ff63fab34b65c33c9b0413b0f7fa4d2e3d8` |
 
-`minSdkVersion` = 24（Android 7.0），`targetSdkVersion` = 28，`versionName` = 1.2.1。
+`minSdkVersion` = 24（Android 7.0），`targetSdkVersion` = 28，`versionName` = 1.2.2。
 
 > APK 每次发版约 33 MB 且必然变化，提交进 Git 会让历史永久膨胀，
 > 因此仓库只保留源码与校验文件 `dist/SHA256SUMS.txt`，二进制一律走 Release。
+
+### 1.2.2 更新内容
+
+- **概览页的目录信息会跟随设置变化**：概览页原来那张「输出目录」卡片显示的是内核固定数据目录
+  （`files/output`，用户根本改不了），改导出目录时页面毫无反应。现在拆成两行：
+  - 「导出目录」显示当前导出位置，点击可直接切换（应用私有 / 手机 Download / 自定义目录）；
+  - 「内核数据目录」保留原信息，只读展示。
+- 导出目录弹窗（1.2.0 已监听应用状态）与概览页现在共用同一套刷新逻辑，切完目录两处同时更新。
 
 ### 1.2.1 更新内容
 

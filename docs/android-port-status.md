@@ -149,6 +149,30 @@ export PATH=$JAVA_HOME/bin:$PATH
 - 产物：`SubsCheck-1.2.1-arm64-v8a.apk`（34,433,021 B，sha256 `788fd015…c81b`）、
   `SubsCheck-1.2.1-armeabi-v7a.apk`（34,348,441 B，sha256 `880696ba…17e3`），versionCode 4。
 
+### 1.2.2：概览页目录信息跟随设置（2026-11-11，MuMu x86_64 release 包）
+
+需求来自「app 的概览页面的显示输出目录不会随着更改而变化」。
+
+- **根因**：`lib/pages/overview.dart` 那张卡从 v1.0 起就是写死的 `Text(state.outputDir)`，
+  而 `AppState.outputDir`（`lib/src/app_state.dart:30`）取的是 `info['outputDir']`，
+  即 `KernelManager.kt` 里 `val outputDir: File get() = File(baseDir, "output")` 的**内核固定数据目录**，
+  用户在任何界面都改不了它；用户能改的是「导出目录」`AppState.exportPath` / `exportLabel`
+  （`app_state.dart:33-34`，来自 `ExportStore.info(app)`），概览页从未读过。刷新链路本身没问题：
+  `lib/pages/home.dart:23` 用 `AnimatedBuilder(animation: widget.state)` 包住 IndexedStack，
+  `applyExportInfo` 会 `notifyListeners`。
+- **修法**：原来单张「输出目录」卡改成两行 ——
+  - 「导出目录」：`state.exportLabel` + 11px 的 `state.exportPath` + 右侧 chevron，
+    `onTap` 直接 `showExportDirSheet(context, state)`，概览页不用跑去设置页也能改；
+  - 「内核数据目录」：`Icons.storage_outlined` + `state.outputDir`，只读展示。
+- 弹窗侧的刷新早在 1.2.0 就修好了（`lib/src/export_dir.dart:99` 的 `_ExportDirSheet.build` 用
+  `ListenableBuilder(listenable: s, ...)` 包住 `_buildBody`）；本次只是让概览页也走同一条 `AppState` 通知链路。
+- 实测（MuMu x86_64，display 2，2560x1440）：概览页切到「手机 Download/SubsCheck」后卡片**原地**变为
+  `/storage/emulated/0/Download/SubsCheck`，再切回私有目录同样即时刷新。
+- `flutter analyze` → No issues found；`flutter test` → 2 passed。
+- 产物：`SubsCheck-1.2.2-arm64-v8a.apk`（34,433,649 B，sha256 `5fb440c6…8c73`）、
+  `SubsCheck-1.2.2-armeabi-v7a.apk`（34,349,001 B，sha256 `d9d5bb83…e3d8`），versionCode 5，
+  签名证书与 1.2.0/1.2.1 相同（`d3af548e…eb9b`），可直接覆盖安装。
+
 ## 仓库体积治理（2026-11-10）
 
 发版三轮后仓库膨胀到 580 MB，做了两步处理：
