@@ -24,13 +24,20 @@ Windows 版 SubsCheck 依赖 proot / Termux 那套才能上安卓。本 App 换�
 
 | 包 | 适用 | SHA-256 |
 |---|---|---|
-| `SubsCheck-1.2.3-arm64-v8a.apk` | 2018 年之后绝大多数手机 | `b5603bda608ce256ae027b6ea3d5c8f9767aaff7166d7cffb6af1ae498c7e803` |
-| `SubsCheck-1.2.3-armeabi-v7a.apk` | 老 32 位设备 | `dd75fd4aadc1021cd8ad82a83f2e5d33399d561620456d052819cf60736708fb` |
+| `SubsCheck-1.2.4-arm64-v8a.apk` | 2018 年之后绝大多数手机 | `40270ab0a228f09030d19b52f2f867d723d56b5776dec273795ee977eb455177` |
+| `SubsCheck-1.2.4-armeabi-v7a.apk` | 老 32 位设备 | `30ce7f86f3f7763d2157ddfa4607b12640968da11ac074f1ab17801a497c348e` |
 
-`minSdkVersion` = 24（Android 7.0），`targetSdkVersion` = 28，`versionName` = 1.2.3。
+`minSdkVersion` = 24（Android 7.0），`targetSdkVersion` = 28，`versionName` = 1.2.4。
 
 > APK 每次发版约 33 MB 且必然变化，提交进 Git 会让历史永久膨胀，
 > 因此仓库只保留源码与校验文件 `dist/SHA256SUMS.txt`，二进制一律走 Release。
+
+### 1.2.4 更新内容
+
+- **导出目录只能在一个地方改**：之前概览页、订阅页、设置页三处都能弹出导出目录选择框，
+  同一个开关有三套入口，状态刷新也各写各的。现在只在 **设置 → 导出文件** 里可以修改，
+  概览页的「导出目录」与订阅页的「导出文件位置」改为只读展示（仍能看到当前路径），
+  避免在别处点了以为改了、其实没改。
 
 ### 1.2.3 更新内容
 

@@ -208,6 +208,25 @@ export PATH=$JAVA_HOME/bin:$PATH
 - 产物：`SubsCheck-1.2.3-arm64-v8a.apk`（34,434,777 B，sha256 `b5603bda…e803`）、
   `SubsCheck-1.2.3-armeabi-v7a.apk`（34,350,121 B，sha256 `dd75fd4a…08fb`），versionCode 6。
 
+### 1.2.4：导出目录入口收敛到设置页（2026-11-11，MuMu x86_64 release 包）
+
+用户反馈：「概览和设置里都能改输出目录，留一个就行」。
+
+- **实际有三处入口**（用户只注意到两处）：`lib/pages/overview.dart:159`「导出目录」、
+  `lib/pages/settings.dart:218`「导出目录」、`lib/pages/subscription.dart:179`「导出文件位置」
+  （标题不同所以此前没被当成同一开关），三处都 `onTap: showExportDirSheet(...)`。
+- **改法**：导出目录属于设置项，只保留 **设置 → 导出文件** 一个可改入口；
+  概览页与订阅页的对应 ListTile 去掉 `trailing: Icon(Icons.chevron_right)` 与 `onTap`，
+  改为只读展示当前路径，并删掉两页里已无用的 `import '../src/export_dir.dart';`
+  （否则 `unused_import` 会让 `flutter analyze` 报错）。
+  这样做的理由：同一开关分散在多处，每处都要各自维护刷新逻辑（1.2.2 就为此改过一轮），
+  收敛到一处后 `showExportDirSheet` 内部的状态监听成为唯一刷新路径。
+- 实测（MuMu，SDK 32 / Android 12）：概览页「导出目录」行已无 chevron、点击无任何反应；
+  订阅页「导出文件位置」同样只读；设置页「导出文件」卡片点击仍能正常弹出三项选择框。
+- `flutter analyze` → No issues found；`flutter test` → 2 passed。
+- 产物：`SubsCheck-1.2.4-arm64-v8a.apk`（34,434,513 B，sha256 `40270ab0…5177`）、
+  `SubsCheck-1.2.4-armeabi-v7a.apk`（34,349,845 B，sha256 `30ce7f86…48e`），versionCode 7。
+
 ## 仓库体积治理（2026-11-10）
 
 发版三轮后仓库膨胀到 580 MB，做了两步处理：

@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../src/app_state.dart';
-import '../src/export_dir.dart';
 import '../src/exporter.dart';
 import '../src/native.dart';
 
@@ -182,11 +181,6 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
                   SelectableText(widget.state.exportPath, style: const TextStyle(fontSize: 11)),
                 ],
               ),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () async {
-                await showExportDirSheet(context, widget.state);
-                if (mounted) setState(() {});
-              },
             ),
           ),
         ],

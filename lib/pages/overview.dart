@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../src/app_state.dart';
-import '../src/export_dir.dart';
 
 class OverviewPage extends StatelessWidget {
   const OverviewPage({super.key, required this.state});
@@ -154,6 +153,9 @@ class OverviewPage extends StatelessWidget {
           Card(
             child: Column(
               children: <Widget>[
+                // 只展示，不在这一页改。导出目录是设置项，改的入口统一放在
+                // 设置页（设置 → 导出文件 → 导出目录），概览页与订阅页都只读，
+                // 免得同一个开关在三个地方各开一个入口、行为还要各自维护。
                 ListTile(
                   leading: const Icon(Icons.folder_outlined),
                   title: const Text('导出目录'),
@@ -165,8 +167,6 @@ class OverviewPage extends StatelessWidget {
                       Text(state.exportPath, style: const TextStyle(fontSize: 11)),
                     ],
                   ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => showExportDirSheet(context, state),
                 ),
                 const Divider(height: 1),
                 ListTile(
