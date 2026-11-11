@@ -1,10 +1,12 @@
 package com.subscheck.subscheck
 
+import android.app.AppOpsManager
 import android.app.DownloadManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.Process
 import android.provider.Settings
 import android.util.Log
 import androidx.core.content.FileProvider
@@ -21,6 +23,15 @@ object ApkDownloader {
 
     private const val TAG = "SubsCheckDownload"
     private const val MAX_BYTES = 300L * 1024 * 1024
+
+    /**
+     * 「安装未知应用」这条 AppOp 的名字。
+     *
+     * 相当于 AppOpsManager.OPSTR_REQUEST_INSTALL_PACKAGES，但该常量在公开 SDK 里是隐藏的
+     * （直接引用会编译报 Unresolved reference），只能写字面量。值取自 AOSP
+     * frameworks/base/core/java/android/app/AppOpsManager.java。
+     */
+    private const val OP_INSTALL_PACKAGES = "android:request_install_packages"
 
     @Volatile private var state: MutableMap<String, Any?> = HashMap()
 
@@ -129,13 +140,48 @@ object ApkDownloader {
         throw IllegalStateException("重定向过多")
     }
 
-    /** Android 8.0+ 未授予「安装未知应用」时不能拉起安装器。 */
+    /**
+     * 读「安装未知应用」这条 AppOps 的真实模式。
+     *
+     * 只信 [android.content.pm.PackageManager.canRequestPackageInstalls] 是不够的：
+     * 个别 ROM（以及 targetSdk 被锁在 28 的我们）上它和系统设置里的开关并不同步，
+     * 用户明明已经打开开关，返回值仍是 false，于是 UI 永远停在「未授权」。
+     * AppOps 才是系统设置页真正写入的那个值。
+     */
+    private fun installOpMode(ctx: Context): Int {
+        return try {
+            val am = ctx.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+            if (Build.VERSION.SDK_INT >= 29) {
+                am.unsafeCheckOpNoThrow(OP_INSTALL_PACKAGES, Process.myUid(), ctx.packageName)
+            } else {
+                @Suppress("DEPRECATION")
+                am.checkOpNoThrow(OP_INSTALL_PACKAGES, Process.myUid(), ctx.packageName)
+            }
+        } catch (e: Throwable) {
+            Log.w(TAG, "read install appop failed: " + e.message)
+            AppOpsManager.MODE_DEFAULT
+        }
+    }
+
+    /**
+     * Android 8.0+ 是否已允许「安装未知应用」。
+     *
+     * 两个来源任一为 true 就放行：
+     * - AppOps 里的 REQUEST_INSTALL_PACKAGES，是系统设置页真正写入的那个值；
+     * - [android.content.pm.PackageManager.canRequestPackageInstalls]，公开 API，
+     *   但在 targetSdk 被锁在 28 的本应用上、以及部分 ROM 上会和开关不同步，
+     *   用户明明开好了它仍返回 false，界面就一直卡在「未授权」。
+     * 误判为「已允许」的代价只是多弹一次安装器，系统自己还会再挡一次并给出引导，
+     * 因此宁可放宽，也不要让已授权的用户被一句「未授权」堵死。
+     */
     fun isInstallAllowed(ctx: Context): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true
+        if (installOpMode(ctx) == AppOpsManager.MODE_ALLOWED) return true
         return try {
             ctx.packageManager.canRequestPackageInstalls()
-        } catch (e: Exception) {
-            true
+        } catch (e: Throwable) {
+            Log.w(TAG, "canRequestPackageInstalls failed: " + e.message)
+            false
         }
     }
 
@@ -162,8 +208,8 @@ object ApkDownloader {
         return false
     }
 
-    private fun install(ctx: Context, apk: File) {
-        if (!isInstallAllowed(ctx)) {
+    private fun install(ctx: Context, apk: File, force: Boolean = false) {
+        if (!force && !isInstallAllowed(ctx)) {
             // 包已下载好，只差一次系统授权；用户在授权页打开开关后回到 App 会自动续装。
             set("needPermission", true)
             set("installing", false)
@@ -201,6 +247,44 @@ object ApkDownloader {
         if (!apk.exists() || apk.length() < 1024) return false
         Log.i(TAG, "install permission granted, resuming install")
         install(ctx, apk)
+        return true
+    }
+
+    /**
+     * 兜底续装：不依赖 needPermission/done 这些内存标记，直接从缓存里找最近下载的包再装一次。
+     *
+     * resumeIfPending 要求 needPermission==true，但 App 被杀掉重建、或用户中途离开「关于」页
+     * 再回来时这些标记会丢，于是「我已允许，继续安装」点了毫无反应。这里按文件本身兜底。
+     */
+    /** 缓存里是否还留着已下载好的更新包（进程重建后内存标记会丢，只能看文件）。 */
+    fun hasCachedApk(ctx: Context): Boolean = cachedApk(ctx) != null
+
+    private fun cachedApk(ctx: Context): File? {
+        val dir = File(ctx.cacheDir, "update")
+        return dir.listFiles()
+            ?.filter { it.isFile && it.name.endsWith(".apk", true) && it.length() > 1024 }
+            ?.maxByOrNull { it.lastModified() }
+    }
+
+    fun installCached(ctx: Context): Boolean {
+        if (!isInstallAllowed(ctx)) return false
+        val apk = cachedApk(ctx) ?: return false
+        Log.i(TAG, "install cached apk: " + apk.name)
+        install(ctx, apk)
+        return true
+    }
+
+    /**
+     * 用户主动点了「继续安装」时的最后一手：不再自己判权限，直接把安装器拉起来。
+     *
+     * 权限读取在某些 ROM 上就是和开关对不上，App 这边判不准，那就交给系统判——
+     * 真没授权时安装器自己会弹「已阻止安装」并给出「设置」按钮，比让用户对着
+     * 一句「还没有允许」干瞪眼要强。只有用户显式点击才会走到这里。
+     */
+    fun forceInstallCached(ctx: Context): Boolean {
+        val apk = cachedApk(ctx) ?: return false
+        Log.i(TAG, "force install cached apk: " + apk.name)
+        install(ctx, apk, force = true)
         return true
     }
 

@@ -180,14 +180,25 @@ class MainActivity : FlutterActivity() {
                 out
             }
 
-            "installStatus" -> mapOf("allowed" to ApkDownloader.isInstallAllowed(this))
+            "installStatus" -> mapOf(
+                "allowed" to ApkDownloader.isInstallAllowed(this),
+                "hasCached" to ApkDownloader.hasCachedApk(this)
+            )
 
             "installNow" -> {
-                val ok = ApkDownloader.resumeIfPending(this)
+                // 先走「上次卡在权限上」的续装；标记可能因进程重建而丢失，再从缓存兜底。
+                val ok = ApkDownloader.resumeIfPending(this) || ApkDownloader.installCached(this)
                 val out = HashMap<String, Any?>(ApkDownloader.status())
                 out["relaunched"] = ok
+                out["allowed"] = ApkDownloader.isInstallAllowed(this)
                 out
             }
+
+            // 用户显式点「继续安装」时的兜底：不判权限，直接交给系统安装器裁决。
+            "installForce" -> mapOf(
+                "relaunched" to ApkDownloader.forceInstallCached(this),
+                "allowed" to ApkDownloader.isInstallAllowed(this)
+            )
 
             "notifyPermission" -> mapOf("granted" to hasNotificationPermission())
 

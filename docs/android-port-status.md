@@ -173,6 +173,41 @@ export PATH=$JAVA_HOME/bin:$PATH
   `SubsCheck-1.2.2-armeabi-v7a.apk`（34,349,001 B，sha256 `d9d5bb83…e3d8`），versionCode 5，
   签名证书与 1.2.0/1.2.1 相同（`d3af548e…eb9b`），可直接覆盖安装。
 
+### 1.2.3：修复「已授权安装未知应用仍显示未授权」（2026-11-11，MuMu x86_64 release 包）
+
+用户反馈：「app 内升级时出现了问题，已经授权安装未知权限，点击已经授权仍然显示未授权」。
+
+- **根因**：权限判定只有一个来源 —— `ApkDownloader.isInstallAllowed()` 里的
+  `PackageManager.canRequestPackageInstalls()`。本应用为让非 PIE 的内核能被 exec，
+  把 `targetSdk` 锁死在 28（`android/app/build.gradle.kts` 有注释说明），
+  这个 API 在部分系统上与「安装未知应用」开关并不同步，开关已开仍返回 false，
+  于是 UI 永远停在未授权。设备侧证据：`cmd appops get … REQUEST_INSTALL_PACKAGES`
+  在开关打开后返回 `REQUEST_INSTALL_PACKAGES: allow`，而 `set … default` 后回到
+  `No operations. / Default mode: default` —— 这条 AppOp 可读回且与开关一致，是更可靠的来源。
+- **改法**：
+  - `ApkDownloader.kt` 新增 `private const val OP_INSTALL_PACKAGES = "android:request_install_packages"`
+    （`AppOpsManager.OPSTR_REQUEST_INSTALL_PACKAGES` 在公开 SDK 里是隐藏常量，直接引用编译报
+    `Unresolved reference`）与 `installOpMode()`（SDK>=29 用 `unsafeCheckOpNoThrow`，否则
+    `checkOpNoThrow`）；`isInstallAllowed()` 改为「AppOps 为 MODE_ALLOWED 即放行，否则回落原 API」。
+  - 新增 `hasCachedApk()` / `cachedApk()`（扫 `cacheDir/update`，取最新一个大于 1024 B 的 apk）、
+    `installCached()`、`forceInstallCached()`（不判权限，走 `install(ctx, apk, force = true)`）。
+  - `MainActivity.kt`：`installStatus` 增返 `hasCached`；`installNow` 改为
+    `resumeIfPending() || installCached()` 并回传 `allowed`；新增 `installForce` 通道方法。
+  - `lib/src/native.dart`：新增 `installState()`、`installForce()`。
+  - `lib/pages/about.dart`：新增 `_restorePendingInstall()`（进页面时按 `hasCached && !allowed`
+    还原「只差授权」状态）；`_installNow()` 在正常续装失败后自动走 `installForce()` 兜底；
+    `_grantInstallPermission()` 打开设置页后启动轮询监视，不再只给一句 toast。
+- 实测（MuMu，SDK 32 / Android 12）：
+  - 把 release 包装进 `cacheDir/update/SubsCheck-1.2.3.apk` 并 `appops set … default` 后打开关于页，
+    两项引导正常出现；
+  - 点「我已允许，继续安装」→ 日志 `force install cached apk: SubsCheck-1.2.3.apk` →
+    系统直接弹出「要更新此应用吗？」→「更新」→ `versionCode=6`、`InstallSuccess`；
+  - 点「允许安装未知应用」→ 系统页开关打开后 `REQUEST_INSTALL_PACKAGES: allow` →
+    返回即自动拉起安装器（日志 `install cached apk: SubsCheck-1.2.3.apk`），无需再点第二次。
+- `flutter analyze` → No issues found；`flutter test` → 2 passed。
+- 产物：`SubsCheck-1.2.3-arm64-v8a.apk`（34,434,777 B，sha256 `b5603bda…e803`）、
+  `SubsCheck-1.2.3-armeabi-v7a.apk`（34,350,121 B，sha256 `dd75fd4a…08fb`），versionCode 6。
+
 ## 仓库体积治理（2026-11-10）
 
 发版三轮后仓库膨胀到 580 MB，做了两步处理：

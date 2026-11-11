@@ -40,6 +40,21 @@ class _AboutPageState extends State<AboutPage> {
   void initState() {
     super.initState();
     _check(silent: true);
+    _restorePendingInstall();
+  }
+
+  /// 进程重建、或上次下载到一半离开页面时，内存里「还差授权」的标记会丢。
+  /// 这里按缓存里的包和系统权限把状态还原出来，免得用户回来找不到继续安装的入口。
+  Future<void> _restorePendingInstall() async {
+    final s = await Native.installState();
+    if (!mounted) return;
+    if (s['hasCached'] == true && s['allowed'] != true) {
+      setState(() {
+        _needInstallPermission = true;
+        _downloadMsg = '安装包已下载，还需允许「安装未知应用」';
+      });
+      _startPermWatch();
+    }
   }
 
   @override
@@ -186,27 +201,34 @@ class _AboutPageState extends State<AboutPage> {
       _toast('没找到系统设置页，请到「设置 → 应用 → 特殊权限 → 安装未知应用」里手动允许');
       return;
     }
-    _toast('请在系统页面允许「安装未知应用」，返回后会自动继续安装');
+    _toast('已打开系统授权页，允许后返回会自动继续安装');
+    _startPermWatch();
   }
 
+  /// 拉起安装器。
+  ///
+  /// 先按正常路径走（续装上次卡住的、或安装缓存里的包）；失败时不再相信
+  /// 自己读到的权限值——部分 ROM 上它和系统开关就是不同步，用户明明授权好了
+  /// 依然收到「还没有允许」。此时直接把包丢给系统安装器，由系统自己裁决并引导，
+  /// 这样点下去至少总有一个结果。
   Future<void> _installNow() async {
-    final r = await Native.installNow();
+    var r = await Native.installNow();
     if (!mounted) return;
+    if (r['relaunched'] != true) {
+      r = await Native.installForce();
+      if (!mounted) return;
+    }
+    _permPoll?.cancel();
+    _permPoll = null;
     if (r['relaunched'] == true) {
-      _permPoll?.cancel();
-      _permPoll = null;
       setState(() {
         _needInstallPermission = false;
         _downloadMsg = '已拉起安装器，请确认安装';
       });
       return;
     }
-    if (r['allowed'] != true) {
-      _toast('还没有允许「安装未知应用」');
-      return;
-    }
-    _toast('安装包已失效，请重新下载');
     setState(() => _needInstallPermission = false);
+    _toast('安装包已不在，请重新下载');
   }
 
   @override

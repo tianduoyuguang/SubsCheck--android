@@ -106,6 +106,12 @@ class Native {
     return r['allowed'] == true;
   }
 
+  /// 是否已允许安装未知应用 + 缓存里是否还留着下好的更新包。
+  static Future<Map<String, dynamic>> installState() => _call('installStatus');
+
+  /// 不判权限，直接把缓存里的更新包交给系统安装器（由系统再挡一次）。
+  static Future<Map<String, dynamic>> installForce() => _call('installForce');
+
   /// 用户授权后立即续装这次下载的包；relaunched 表示是否真的重新拉起了安装器。
   static Future<Map<String, dynamic>> installNow() => _call('installNow');
 }

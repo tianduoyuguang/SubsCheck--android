@@ -1,7 +1,7 @@
 name: subscheck
 description: "SubsCheck 安卓版：订阅节点检测与导出"
 publish_to: 'none'
-version: 1.2.2+5
+version: 1.2.3+6
 
 environment:
   sdk: ^3.13.7

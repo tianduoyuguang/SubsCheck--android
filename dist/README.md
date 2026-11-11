@@ -24,13 +24,26 @@ Windows 版 SubsCheck 依赖 proot / Termux 那套才能上安卓。本 App 换�
 
 | 包 | 适用 | SHA-256 |
 |---|---|---|
-| `SubsCheck-1.2.2-arm64-v8a.apk` | 2018 年之后绝大多数手机 | `5fb440c6f5c6a99750454a799b5e11e91700731ea555a57282eba6ca6a6f8c73` |
-| `SubsCheck-1.2.2-armeabi-v7a.apk` | 老 32 位设备 | `d9d5bb83b9ec2ef1d8e3943124b94ff63fab34b65c33c9b0413b0f7fa4d2e3d8` |
+| `SubsCheck-1.2.3-arm64-v8a.apk` | 2018 年之后绝大多数手机 | `b5603bda608ce256ae027b6ea3d5c8f9767aaff7166d7cffb6af1ae498c7e803` |
+| `SubsCheck-1.2.3-armeabi-v7a.apk` | 老 32 位设备 | `dd75fd4aadc1021cd8ad82a83f2e5d33399d561620456d052819cf60736708fb` |
 
-`minSdkVersion` = 24（Android 7.0），`targetSdkVersion` = 28，`versionName` = 1.2.2。
+`minSdkVersion` = 24（Android 7.0），`targetSdkVersion` = 28，`versionName` = 1.2.3。
 
 > APK 每次发版约 33 MB 且必然变化，提交进 Git 会让历史永久膨胀，
 > 因此仓库只保留源码与校验文件 `dist/SHA256SUMS.txt`，二进制一律走 Release。
+
+### 1.2.3 更新内容
+
+- **修复「已经允许安装未知应用，App 仍说没授权」**：权限判断原来只信
+  `PackageManager.canRequestPackageInstalls()`。本应用因内核要求把 `targetSdk` 锁在 28，
+  这个 API 在部分系统上会和「安装未知应用」开关不同步 —— 用户明明开好了，它仍返回 false，
+  界面于是永远停在未授权。现在改为先读系统的 AppOps 值（`android:request_install_packages`，
+  也就是设置页真正写入的那一项），读不到才回落到原 API。
+- **「我已允许，继续安装」不会再没反应**：原来它依赖内存里的「下载完成且待授权」标记，
+  进程被回收或离开关于页再回来，标记就丢了，点了只弹一句「安装包已失效」。
+  现在改为直接看缓存目录里是否还留着 apk；确实已经授权时，即便权限读取仍有偏差，
+  也会把安装包交给系统安装器，由系统自己裁决并引导。
+- 打开关于页时会自动还原「还差一步授权」的状态，不用重新下载。
 
 ### 1.2.2 更新内容
 
@@ -66,11 +79,16 @@ Windows 版 SubsCheck 依赖 proot / Termux 那套才能上安卓。本 App 换�
 
 - 设置页新增 **免责声明**（软件性质 / 使用风险 / 数据与隐私 / 责任限制 / 开源许可）。
 - 设置页新增 **关于**：版本信息、运行信息（包名、构建号、设备、ABI、SDK、API Key）、相关链接。
-- 关于页支持 **检查更新**：读取 GitHub Release，自动按设备 ABI 选择安装包，可直连或走镜像下载并直接调起安装器。
-- 关于页可直接打开项目地址、内核地址、内核发布页、上游安卓部署说明与分流模板来源（失败时回落为系统分享）。
+- 关于页支持 **检查更新**：读取 GitHub Release，按设备 ABI 自动选包，可直连或走镜像下载并调起安装器。
+- 关于页可打开项目地址、内核地址、内核发布页、上游安卓部署说明与分流模板来源（失败回落为系统分享）。
 - 修正内核版本号解析（新版内核 `/api/version` 返回 JSON）。
 
-校验：`sha256sum -c SHA256SUMS.txt`。
+校验：
+
+```bash
+cd dist
+sha256sum -c SHA256SUMS.txt
+```
 
 安装时系统会提示「此应用专为旧版 Android 打造」，属正常现象（就是上面说的 targetSdk=28）。
 
