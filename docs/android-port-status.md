@@ -227,6 +227,35 @@ export PATH=$JAVA_HOME/bin:$PATH
 - 产物：`SubsCheck-1.2.4-arm64-v8a.apk`（34,434,513 B，sha256 `40270ab0…5177`）、
   `SubsCheck-1.2.4-armeabi-v7a.apk`（34,349,845 B，sha256 `30ce7f86…48e`），versionCode 7。
 
+### 1.2.5：高级卡片精简 + 订阅页去掉导出文件位置（2026-11-14，未在模拟器复测）
+
+用户要求（m05728 原文）：「app里设置-高级 里的内核二进制与工作目录删掉」；
+（m06031 原文）：「把订阅page里的导出文件位置删掉」。
+订阅页这处改动原计划作为 1.2.6 发布，最后按用户要求**合并进 1.2.5 一起发**，
+所以 versionName 仍为 1.2.5、versionCode 仍为 8，两个 apk 重新打包。
+
+- **设置 → 高级**：`lib/pages/settings.dart` 里删掉两个 ListTile ——
+  「内核二进制」（显示 `info['nativeLibraryDir']`）、「工作目录」（显示 `info['filesDir']`），
+  连同它们前面的两条 `const Divider(height: 1),` 一并删除。
+  删后 `nativeLibraryDir` / `filesDir` 在 `lib/` 下已无任何引用；
+  `info['pid'/'abi'/'sdk']`（settings.dart:123）与 `info['versionName']`（settings.dart:301）仍在用。
+  结果：高级卡片只剩「编辑配置文件」与「API Key」两项（settings.dart:269、277）。
+- **订阅页**：`lib/pages/subscription.dart` 里删掉「导出文件位置」那张 `Card`（`leading: Icon(Icons.folder_open)`，
+  副标题展示 `widget.state.exportLabel` 与 `SelectableText(widget.state.exportPath)`），
+  连同它前面的 `const SizedBox(height: 16),` 一起删除，避免页面底部多出空档。
+  该卡片 1.2.4 起已无 `onTap`，纯只读，没有交互逻辑要迁移。
+  删后 `exportLabel` / `exportPath` 在该文件中已无出现，`widget.state` 仍有 4 处使用
+  （第 30、39、54、77 行），故 `import '../src/app_state.dart';` 保留。
+- 剩余两处导出目录展示不变：`lib/pages/settings.dart:222/225`（唯一可改入口）、
+  `lib/pages/overview.dart:165/167`（只读）。
+- 校验：`flutter analyze` → No issues found（3.7s）；`flutter test` → 2 passed。
+- **本轮没能装进模拟器验证**：MuMu 后端服务起不来（`MuMuManager.exe control -v 0 launch` 与
+  `mumu-cli.exe control --vmindex 0 launch` 均返回 `{"errcode": -503, "errmsg": "mainnx connect failed"}`），
+  复核方式退化为源码核对 + 编译通过。
+- 产物（合并后重新打包）：`SubsCheck-1.2.5-arm64-v8a.apk`（34,434,589 B，sha256 `e3600485…a1eb`）、
+  `SubsCheck-1.2.5-armeabi-v7a.apk`（34,348,501 B，sha256 `99fa0afd…8fb2`），versionCode 8，
+  aapt2 确认 versionName=1.2.5 / targetSdk 28 / native-code 各为 arm64-v8a 与 armeabi-v7a。
+
 ### 真机安装时的「开发者身份验证」提示（2026-11-11，仅文档）
 
 用户真机装 1.2.4 时报「安装的时候弹出无开发者认证」，追问确认**可以安装、只是弹提示**。

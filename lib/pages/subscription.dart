@@ -167,22 +167,6 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.folder_open),
-              title: const Text('导出文件位置'),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(widget.state.exportLabel,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 2),
-                  SelectableText(widget.state.exportPath, style: const TextStyle(fontSize: 11)),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
     );

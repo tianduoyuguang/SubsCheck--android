@@ -286,18 +286,6 @@ class _SettingsPageState extends State<SettingsPage> {
                   },
                 ),
               ),
-              const Divider(height: 1),
-              ListTile(
-                leading: const Icon(Icons.storage_outlined),
-                title: const Text('内核二进制'),
-                subtitle: SelectableText((info['nativeLibraryDir'] ?? '').toString(), style: const TextStyle(fontSize: 11)),
-              ),
-              const Divider(height: 1),
-              ListTile(
-                leading: const Icon(Icons.folder_outlined),
-                title: const Text('工作目录'),
-                subtitle: SelectableText((info['filesDir'] ?? '').toString(), style: const TextStyle(fontSize: 11)),
-              ),
             ],
           ),
         ),
