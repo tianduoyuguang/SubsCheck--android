@@ -326,7 +326,13 @@ export PATH=$JAVA_HOME/bin:$PATH
   arm64-v8a 与 armeabi-v7a）：
   - `dist/SubsCheck-1.2.6-arm64-v8a.apk` 34,441,529 B，sha256 `622182e55d845c9897e9d4ae955c2da555a3cbc64b4364a4f875186171214c86`
   - `dist/SubsCheck-1.2.6-armeabi-v7a.apk` 34,358,285 B，sha256 `6318a8b5fdf378d6950c8f012a7e3d70367452275df7d7d155e4c5c90b300ebb`
-- 按用户要求（m05728）本轮只出包，**未发布 Release**。
+- 出包后按用户要求（m05728）暂存未发；用户 m06885「发布」后已发布：
+  提交 `f3e85d0` 与 `cd9377a` 一并 push 到 master，tag `v1.2.6`，
+  Release id **446955432**，https://github.com/tianduoyuguang/SubsCheck--android/releases/tag/v1.2.6
+  （两个 apk + SHA256SUMS.txt，三资产均为 `uploaded`；HEAD 校验 Content-Length 与本地一致：
+  34,441,529 / 34,358,285 / 194）。
+- 同一轮清理了 `dist/` 里 1.2.3 / 1.2.4 / 1.2.5 的旧包与 `build/` 下的历史 apk
+  （含 1.2.1 的 `build/apk-v7a.apk`、1.0.0 的 debug 包、11-02 的旧 release）。
 
 ### 1.2.5：高级卡片精简 + 订阅页去掉导出文件位置（2026-11-14，未在模拟器复测）
 
