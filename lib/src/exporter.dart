@@ -49,12 +49,31 @@ class Exporter {
     return n;
   }
 
-  /// 完整 mihomo 配置：proxies + 模板
+  /// 内置模板（assets/ACL4SSR_Online_Full.yaml）第一行就是 proxy-groups:，
+  /// 没有 port / mode / dns 这些顶层键，直接当完整配置导入会报错，
+  /// 所以这里补一段最小可用的基础配置。端口用 7890 这类常见值，用户可自行改。
+  static const String _base = '''
+mixed-port: 7890
+allow-lan: false
+mode: rule
+log-level: info
+external-controller: 127.0.0.1:9090
+dns:
+  enable: true
+  ipv6: false
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  nameserver:
+    - 223.5.5.5
+    - 119.29.29.29
+''';
+
+  /// 完整 mihomo 配置：基础段 + proxies + 模板
   static Future<String> buildMihomo(String allYaml) async {
     final block = proxiesBlock(allYaml);
     final tpl = await loadTemplate();
     final head = block.trimRight().isEmpty ? 'proxies: []' : 'proxies:\n${block.trimRight()}';
-    return '$head\n\n${tpl.trimLeft()}';
+    return '$_base\n$head\n\n${tpl.trimLeft()}';
   }
 
   /// 只含节点的精简订阅

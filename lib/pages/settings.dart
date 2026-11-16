@@ -15,27 +15,63 @@ class SettingsPage extends StatefulWidget {
   State<SettingsPage> createState() => _SettingsPageState();
 }
 
-class _SettingsPageState extends State<SettingsPage> {
+class _SettingsPageState extends State<SettingsPage> with WidgetsBindingObserver {
   late final TextEditingController _host;
   late final TextEditingController _port;
+  final FocusNode _hostFocus = FocusNode();
+  final FocusNode _portFocus = FocusNode();
   bool _notifyGranted = false;
   bool _saving = false;
+  bool _ignoringBattery = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _host = TextEditingController(text: widget.state.host);
     _port = TextEditingController(text: widget.state.port.toString());
     Native.hasNotificationPermission().then((v) {
       if (mounted) setState(() => _notifyGranted = v);
     });
+    _reloadBattery();
+    // 地址输入框跟随状态变化（构建期不能改控制器，放在监听里做）。
+    widget.state.addListener(_syncAddress);
   }
 
   @override
   void dispose() {
+    widget.state.removeListener(_syncAddress);
+    WidgetsBinding.instance.removeObserver(this);
+    _hostFocus.dispose();
+    _portFocus.dispose();
     _host.dispose();
     _port.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState s) {
+    // 用户可能刚从系统设置页改完电池白名单回来，回前台时重查一次。
+    if (s == AppLifecycleState.resumed) {
+      _reloadBattery();
+      Native.hasNotificationPermission().then((v) {
+        if (mounted) setState(() => _notifyGranted = v);
+      });
+    }
+  }
+
+  Future<void> _reloadBattery() async {
+    final v = await Native.ignoringBattery();
+    if (mounted) setState(() => _ignoringBattery = v);
+  }
+
+  /// 输入框内容跟随 AppState（比如别处 reset 或重启内核后改了端口）。
+  /// 正在编辑时不覆盖，免得把用户输了一半的内容冲掉。
+  void _syncAddress() {
+    if (_hostFocus.hasFocus || _portFocus.hasFocus) return;
+    if (_host.text != widget.state.host) _host.text = widget.state.host;
+    final p = widget.state.port.toString();
+    if (_port.text != p) _port.text = p;
   }
 
   Future<void> _applyAddress() async {
@@ -108,6 +144,11 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    return AnimatedBuilder(
+        animation: widget.state, builder: (context, _) => _body(context));
+  }
+
+  Widget _body(BuildContext context) {
     final info = widget.state.info;
     return ListView(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
@@ -168,6 +209,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       flex: 3,
                       child: TextField(
                         controller: _host,
+                        focusNode: _hostFocus,
                         decoration: const InputDecoration(
                           labelText: '监听地址',
                           helperText: '127.0.0.1 仅本机；0.0.0.0 局域网可访问',
@@ -180,6 +222,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       flex: 2,
                       child: TextField(
                         controller: _port,
+                        focusNode: _portFocus,
                         keyboardType: TextInputType.number,
                         inputFormatters: <TextInputFormatter>[FilteringTextInputFormatter.digitsOnly],
                         decoration: const InputDecoration(labelText: '端口', isDense: true),
@@ -256,7 +299,19 @@ class _SettingsPageState extends State<SettingsPage> {
               ListTile(
                 leading: const Icon(Icons.battery_saver_outlined),
                 title: const Text('忽略电池优化'),
-                subtitle: const Text('建议在系统设置里把本应用加入白名单，避免后台被杀'),
+                subtitle: Text(_ignoringBattery
+                    ? '已加入白名单，后台不易被系统回收'
+                    : '未加入白名单，长时检测可能被系统中断'),
+                trailing: _ignoringBattery
+                    ? const Icon(Icons.check, color: Colors.green)
+                    : TextButton(
+                        onPressed: () async {
+                          await Native.requestIgnoreBattery();
+                          _toast('请在系统设置里允许本应用忽略电池优化');
+                          // 系统设置页返回后由 didChangeAppLifecycleState 刷新状态。
+                        },
+                        child: const Text('去设置'),
+                      ),
               ),
             ],
           ),

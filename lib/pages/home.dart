@@ -20,17 +20,16 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: widget.state,
-      builder: (context, _) {
-        final tabs = <Widget>[
-          OverviewPage(state: widget.state),
-          NodesPage(state: widget.state),
-          SubscriptionPage(state: widget.state),
-          SettingsPage(state: widget.state),
-          LogsPage(state: widget.state),
-        ];
-        return Scaffold(
+    // 页面实例只建一次：状态变化由各页自己的 AnimatedBuilder 处理，
+    // 这里不再包 AnimatedBuilder，否则每 2 秒五页都会整体重建。
+    final tabs = <Widget>[
+      OverviewPage(state: widget.state),
+      NodesPage(state: widget.state),
+      SubscriptionPage(state: widget.state),
+      SettingsPage(state: widget.state),
+      LogsPage(state: widget.state),
+    ];
+    return Scaffold(
           body: SafeArea(
             child: IndexedStack(index: index, children: tabs),
           ),
@@ -46,7 +45,5 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
         );
-      },
-    );
   }
 }

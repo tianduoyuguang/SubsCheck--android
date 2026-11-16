@@ -36,15 +36,6 @@ class KernelApi {
     return _Resp(resp.statusCode, body);
   }
 
-  Future<bool> ping() async {
-    try {
-      final r = await _get('/api/status');
-      return r.code == 200;
-    } catch (_) {
-      return false;
-    }
-  }
-
   Future<Map<String, dynamic>?> status() async {
     try {
       final r = await _get('/api/status');
@@ -67,11 +58,20 @@ class KernelApi {
     }
   }
 
-  /// 内核 /api/logs 返回纯文本（最后 100 行）。
+  /// 内核 /api/logs 返回 JSON：{"logs": ["..."]}（最后 100 行）。
+  /// 老版本内核可能返回纯文本，这里两种都兼容。
   Future<String> serverLogs() async {
     try {
       final r = await _get('/api/logs');
-      return r.body;
+      if (r.code != 200) return '';
+      final body = r.body.trim();
+      try {
+        final v = jsonDecode(body);
+        if (v is Map && v['logs'] is List) {
+          return (v['logs'] as List).map((e) => e.toString()).join('\n');
+        }
+      } catch (_) {}
+      return body;
     } catch (_) {
       return '';
     }
@@ -85,38 +85,6 @@ class KernelApi {
       return r.body;
     } catch (_) {
       return null;
-    }
-  }
-
-  Future<String?> config() async {
-    try {
-      final r = await _get('/api/config');
-      if (r.code != 200) return null;
-      try {
-        final v = jsonDecode(r.body);
-        if (v is Map<String, dynamic>) {
-          final c = v['content'] ?? v['config'];
-          if (c is String) return c;
-        }
-      } catch (_) {}
-      return r.body;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<bool> saveConfig(String content) async {
-    try {
-      final uri = Uri.parse('$baseUrl/api/config');
-      final req = await _client.postUrl(uri);
-      _headers.forEach((k, v) => req.headers.set(k, v));
-      req.headers.contentType = ContentType.json;
-      final payload = jsonEncode(<String, dynamic>{'content': content});
-      req.add(utf8.encode(payload));
-      final resp = await req.close().timeout(const Duration(seconds: 10));
-      return resp.statusCode == 200;
-    } catch (_) {
-      return false;
     }
   }
 

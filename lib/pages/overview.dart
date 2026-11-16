@@ -28,6 +28,12 @@ class OverviewPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 只有这一页关心状态变化，重建范围收在页面内部，
+    // 不要像以前那样用 AnimatedBuilder 包住整个 Scaffold 把五页一起重建。
+    return AnimatedBuilder(animation: state, builder: (context, _) => _body(context));
+  }
+
+  Widget _body(BuildContext context) {
     final st = state.status;
     return RefreshIndicator(
       onRefresh: () => state.refresh(),
@@ -98,6 +104,14 @@ class OverviewPage extends StatelessWidget {
                   LinearProgressIndicator(value: st.aliveRatio.clamp(0.0, 1.0)),
                   const SizedBox(height: 6),
                   Text('测活进度 ${st.aliveDone}/${st.proxyCount}', style: Theme.of(context).textTheme.bodySmall),
+                  // 媒体检测是内核级联管线的第二段：只有测活通过的节点才进入，
+                  // 第三段测速又只跑通过过滤的节点，所以三段分母各不相同。
+                  if (st.hasMediaCheck) ...<Widget>[
+                    const SizedBox(height: 10),
+                    LinearProgressIndicator(value: st.mediaRatio.clamp(0.0, 1.0)),
+                    const SizedBox(height: 6),
+                    Text('媒体检测 ${st.mediaDone}/${st.mediaTotal}', style: Theme.of(context).textTheme.bodySmall),
+                  ],
                   const SizedBox(height: 10),
                   if (st.hasSpeedTest) ...<Widget>[
                     LinearProgressIndicator(value: st.speedRatio.clamp(0.0, 1.0)),

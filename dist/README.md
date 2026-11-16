@@ -24,8 +24,8 @@ Windows 版 SubsCheck 依赖 proot / Termux 那套才能上安卓。本 App 换�
 
 | 包 | 适用 | SHA-256 |
 |---|---|---|
-| `SubsCheck-1.2.6-arm64-v8a.apk` | 2018 年之后绝大多数手机 | `d4d012bae3115b7aa647cf24b31ff2d4a751725b0dfaa64d6a44a8a827927c8d` |
-| `SubsCheck-1.2.6-armeabi-v7a.apk` | 老 32 位设备 | `eb51d8ac5c4692e94ea7caca78e6c863f025c4ed467e3889a91576c9fc23511c` |
+| `SubsCheck-1.2.6-arm64-v8a.apk` | 2018 年之后绝大多数手机 | `622182e55d845c9897e9d4ae955c2da555a3cbc64b4364a4f875186171214c86` |
+| `SubsCheck-1.2.6-armeabi-v7a.apk` | 老 32 位设备 | `6318a8b5fdf378d6950c8f012a7e3d70367452275df7d7d155e4c5c90b300ebb` |
 
 `minSdkVersion` = 24（Android 7.0），`targetSdkVersion` = 28，`versionName` = 1.2.6。
 
@@ -55,7 +55,7 @@ sha256sum -c SHA256SUMS.txt
 2. 「概览 → 立即检测一轮」拉取订阅源并开始测活/测速。一轮完整检测通常 10~30 分钟。
 3. 「节点」看结果（可按速度排序、点开看协议详情）。
 4. 「订阅」页导出：
-   - **完整 mihomo 配置**：proxies + proxy-groups + rule-providers + rules（内置 ACL4SSR 模板）
+   - **完整 mihomo 配置**：基础段（port/mode/dns）+ proxies + proxy-groups + rule-providers + rules（内置 ACL4SSR 模板）
    - **仅节点**：只有 proxies
    导出位置由「设置 → 导出文件 → 导出目录」决定，默认 `Android/data/com.subscheck.subscheck/files/exports/`；
    可改成公共 `Download/SubsCheck` 或任意自选目录。导出后可直接分享给其他设备/clash 客户端。
@@ -69,12 +69,15 @@ sha256sum -c SHA256SUMS.txt
 内核跑起来后监听 `127.0.0.1:8199`，除订阅导出外都只允许本机访问：
 
 ```
-GET  /all.yaml /mihomo.yaml /base64.txt   ← 结果导出
-GET  /sub/<file>                           ← 静态输出
-GET  /export/:target                      ← 转换导出
+GET  /sub/all.yaml                         ← 节点列表（本 App 唯一会产出的订阅文件）
+GET  /all.yaml                             ← 同上，兼容老地址
 POST /api/trigger-check                    ← 触发一轮检测（需 X-API-Key）
 GET  /api/status /api/results /api/logs    ← 状态（需 X-API-Key）
 ```
+
+> 内核只有在启用 Sub-Store 时才会额外生成 `/mihomo.yaml`、`/base64.txt` 与
+> `/export/:target` 的各种格式；本 App 没有启用 Sub-Store，所以这几项不可用。
+> 需要完整 mihomo 配置或 Base64 订阅，请用 App 内的导出功能生成文件。
 
 ## 从源码构建
 

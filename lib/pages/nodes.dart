@@ -18,7 +18,11 @@ class _NodesPageState extends State<NodesPage> {
 
   List<NodeItem> _filtered() {
     var list = widget.state.nodes;
-    if (onlyAlive) list = list.where((n) => n.speed > 0).toList();
+    // 结果文件里只有通过检测的节点，没开测速时 speed 全是 0，
+    // 所以「只看可用」不能用 speed>0 判断，否则一开就把列表清空。
+    if (onlyAlive && widget.state.status.hasSpeedTest) {
+      list = list.where((n) => n.speed > 0).toList();
+    }
     if (query.isNotEmpty) {
       final q = query.toLowerCase();
       list = list.where((n) =>
@@ -37,6 +41,11 @@ class _NodesPageState extends State<NodesPage> {
 
   @override
   Widget build(BuildContext context) {
+    return AnimatedBuilder(
+        animation: widget.state, builder: (context, _) => _body(context));
+  }
+
+  Widget _body(BuildContext context) {
     final items = _filtered();
     return Column(
       children: <Widget>[
@@ -57,7 +66,7 @@ class _NodesPageState extends State<NodesPage> {
               ),
               const SizedBox(width: 8),
               IconButton(
-                tooltip: '只看有速度的节点',
+                tooltip: '只看有速度的节点（未测速时不可用）',
                 isSelected: onlyAlive,
                 icon: const Icon(Icons.filter_alt_outlined),
                 selectedIcon: const Icon(Icons.filter_alt),
@@ -167,27 +176,32 @@ class _NodesPageState extends State<NodesPage> {
             );
         return Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(n.name, style: Theme.of(ctx).textTheme.titleMedium),
-              const SizedBox(height: 10),
-              row('协议', n.type),
-              row('服务器', n.server),
-              row('端口', n.port),
-              if (n.sni.isNotEmpty) row('SNI', n.sni),
-              row('传输', n.network.isEmpty ? '-' : n.network),
-              row('TLS', n.tls ? '是' : '否'),
-              if (n.reality) row('Reality', '是'),
-              row('UDP', n.udp ? '支持' : '不支持'),
-              row('速度', n.speedText),
-              if (n.country.isNotEmpty) row('地区', n.country),
-              if (n.ip.isNotEmpty) row('IP', n.ip),
-              if (n.ipRisk.isNotEmpty) row('IP 风险', n.ipRisk),
-              if (n.media.isNotEmpty) row('解锁', n.media.join(', ')),
-              if (n.subTag.isNotEmpty) row('订阅', n.subTag),
-            ],
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(n.name, style: Theme.of(ctx).textTheme.titleMedium),
+                const SizedBox(height: 10),
+                row('协议', n.type),
+                row('服务器', n.server),
+                row('端口', n.port),
+                if (n.sni.isNotEmpty) row('SNI', n.sni),
+                row('传输', n.network.isEmpty ? '-' : n.network),
+                row('TLS', n.tls ? '是' : '否'),
+                if (n.reality) row('Reality', '是'),
+                row('UDP', n.udp ? '支持' : '不支持'),
+                row('速度', n.speedText),
+                if (n.country.isNotEmpty) row('地区', n.country),
+                if (n.ip.isNotEmpty) row('IP', n.ip),
+                if (n.ipRisk.isNotEmpty) row('IP 风险', n.ipRisk),
+                if (n.media.isNotEmpty) row('解锁', n.media.join(', ')),
+                if (n.subTag.isNotEmpty) row('订阅', n.subTag),
+                // 内核 results.json 里的 details 携带各协议的特有参数
+                // （cipher / ws-path / grpc-service-name / plugin 等），原来完全没展示。
+                for (final d in n.details) row(d.key, d.value),
+              ],
+            ),
           ),
         );
       },

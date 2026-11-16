@@ -21,15 +21,25 @@ class _LogsPageState extends State<LogsPage> {
   @override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (source == 'server') _loadServer();
-    });
+    // 定时器只在看 HTTP 日志时开：内核日志由 AppState 每 2 秒统一拉，
+  // 常驻一个空转的 3 秒定时器没有意义。
+    if (source == 'server') _startTimer();
   }
 
   @override
   void dispose() {
     _timer?.cancel();
     super.dispose();
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 3), (_) => _loadServer());
+  }
+
+  void _stopTimer() {
+    _timer?.cancel();
+    _timer = null;
   }
 
   Future<void> _loadServer() async {
@@ -46,6 +56,11 @@ class _LogsPageState extends State<LogsPage> {
 
   @override
   Widget build(BuildContext context) {
+    return AnimatedBuilder(
+        animation: widget.state, builder: (context, _) => _body(context));
+  }
+
+  Widget _body(BuildContext context) {
     final text = source == 'kernel' ? widget.state.kernelLog : serverLog;
     return Column(
       children: <Widget>[
@@ -61,7 +76,12 @@ class _LogsPageState extends State<LogsPage> {
                 selected: <String>{source},
                 onSelectionChanged: (s) {
                   setState(() => source = s.first);
-                  if (source == 'server') _loadServer();
+                  if (source == 'server') {
+                    _startTimer();
+                    _loadServer();
+                  } else {
+                    _stopTimer();
+                  }
                 },
               ),
               const Spacer(),

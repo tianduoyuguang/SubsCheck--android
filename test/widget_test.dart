@@ -75,6 +75,38 @@ void main() {
     expect(s.speedRatio, closeTo(40 / 55, 1e-9));
   });
 
+  test('媒体检测分母是测活通过数（alivePass）', () {
+    final s = KernelStatus.fromJson(<String, dynamic>{
+      'proxyCount': 120,
+      'available': 42,
+      'pipeline': <String, dynamic>{
+        'aliveDone': 120,
+        'alivePass': 42,
+        'mediaDone': 21,
+        'filterPass': 20,
+      },
+      'hasSpeedTest': true,
+    });
+    expect(s.mediaTotal, 42);
+    expect(s.mediaRatio, closeTo(0.5, 1e-9));
+    expect(s.hasMediaCheck, true);
+  });
+
+  test('NodeItem 解析 details 数组', () {
+    final n = NodeItem.fromJson(<String, dynamic>{
+      'name': 'JP 02',
+      'type': 'vmess',
+      'details': <Map<String, dynamic>>[
+        <String, dynamic>{'k': 'cipher', 'v': 'auto'},
+        <String, dynamic>{'k': 'ws-path', 'v': '/ray'},
+        <String, dynamic>{'k': '', 'v': 'dropped'},
+      ],
+    });
+    expect(n.details.length, 2);
+    expect(n.details.first.key, 'cipher');
+    expect(n.details.last.value, '/ray');
+  });
+
   test('filterPass 还没涨起来时回落到 available，避免 0/0', () {
     final s = KernelStatus.fromJson(<String, dynamic>{
       'proxyCount': 120,

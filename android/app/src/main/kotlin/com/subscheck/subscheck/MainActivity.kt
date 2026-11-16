@@ -21,6 +21,8 @@ class MainActivity : FlutterActivity() {
         private const val REQ_NOTIF = 9001
         private const val REQ_STORAGE = 9002
         const val REQ_TREE = 9003
+        private const val PREFS = "subscheck"
+        private const val KEY_DISCLAIMER = "disclaimer_seen"
     }
 
     private val pool = Executors.newSingleThreadExecutor { r ->
@@ -200,6 +202,35 @@ class MainActivity : FlutterActivity() {
                 "allowed" to ApkDownloader.isInstallAllowed(this)
             )
 
+            // 分享用：把内容写到一份真实存在的缓存副本并返回绝对路径。
+            // 自定义目录（SAF）下 saveExport 返回的是展示用的拼接路径，磁盘上没有这个文件，
+            // 直接交给分享面板会 FileNotFoundException。
+            "shareCopy" -> {
+                val name = call.argument<String>("name") ?: "export.yaml"
+                val content = call.argument<String>("content") ?: ""
+                val dir = java.io.File(cacheDir, "share")
+                if (!dir.exists()) dir.mkdirs()
+                val f = java.io.File(dir, name.replace('/', '_').replace('\\', '_'))
+                f.writeText(content)
+                mapOf("path" to f.absolutePath, "bytes" to f.length(), "name" to name)
+            }
+
+            // 部分国产 ROM 会在息屏后冻结后台进程，导致前台服务里的内核被掐，
+            // 这里只做「引导用户去系统里放行」，不尝试代改。
+            "batteryStatus" -> mapOf("ignoring" to isIgnoringBattery())
+
+            "requestBattery" -> {
+                runOnUiThread { openBatterySettings() }
+                mapOf("ignoring" to isIgnoringBattery())
+            }
+
+            "disclaimerSeen" -> mapOf("seen" to prefs().getBoolean(KEY_DISCLAIMER, false))
+
+            "setDisclaimerSeen" -> {
+                prefs().edit().putBoolean(KEY_DISCLAIMER, true).apply()
+                mapOf("ok" to true)
+            }
+
             "notifyPermission" -> mapOf("granted" to hasNotificationPermission())
 
             "requestNotifyPermission" -> {
@@ -303,6 +334,45 @@ class MainActivity : FlutterActivity() {
         ExportStore.setTree(this, uri)
         Log.i(TAG, "export dir -> " + ExportStore.displayPath(this))
         channel?.invokeMethod("exportDirChanged", ExportStore.info(this))
+    }
+
+    private fun prefs() = getSharedPreferences(PREFS, MODE_PRIVATE)
+
+    private fun isIgnoringBattery(): Boolean {
+        if (Build.VERSION.SDK_INT < 23) return true
+        return try {
+            val pm = getSystemService(POWER_SERVICE) as android.os.PowerManager
+            pm.isIgnoringBatteryOptimizations(packageName)
+        } catch (e: Throwable) {
+            Log.w(TAG, "battery status: " + e.message)
+            true
+        }
+    }
+
+    /**
+     * 拉系统「忽略电池优化」白名单。优先直接弹本应用的授权框，
+     * 个别 ROM 不认这个 action，退到电池优化列表页让用户自己找。
+     */
+    private fun openBatterySettings() {
+        if (Build.VERSION.SDK_INT < 23) return
+        try {
+            val direct = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = android.net.Uri.parse("package:" + packageName)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(direct)
+            return
+        } catch (e: Exception) {
+            Log.w(TAG, "request ignore battery: " + e.message)
+        }
+        try {
+            val list = Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(list)
+        } catch (e: Exception) {
+            Log.w(TAG, "battery settings: " + e.message)
+        }
     }
 
     private fun hasNotificationPermission(): Boolean {

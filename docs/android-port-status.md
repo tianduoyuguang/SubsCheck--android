@@ -227,7 +227,7 @@ export PATH=$JAVA_HOME/bin:$PATH
 - 产物：`SubsCheck-1.2.4-arm64-v8a.apk`（34,434,513 B，sha256 `40270ab0…5177`）、
   `SubsCheck-1.2.4-armeabi-v7a.apk`（34,349,845 B，sha256 `30ce7f86…48e`），versionCode 7。
 
-### 1.2.6：测速进度分母改为可用节点数（2026-11-16，MuMu x86_64 release 包）
+### 1.2.6：测速进度分母修正 + 审查报告全部修理（2026-11-16，测速改动在 MuMu x86_64 复测）
 
 用户反馈（m06201 原文）：「运行时的测速进度应该是已测速/可用节点，而不是已测速/节点总数」。
 
@@ -253,6 +253,80 @@ export PATH=$JAVA_HOME/bin:$PATH
   speedTotal=55、speedRatio=40/55；「filterPass 还没涨起来时回落到 available」断言 speedTotal=42。
   `flutter analyze` → No issues found；`flutter test` → **4 passed**。
 - 产物：versionCode 9 / versionName 1.2.6。
+
+#### 同一版本内的「审查报告全部修理」（纯代码改动，未在模拟器复测）
+
+用户 m06349 要求只读代码审查，随后 m06575 下令「全部修理，打包成1.2.6」。
+下面按问题逐条记，涉及文件与行号以本次提交为准。
+
+**必修项**
+
+1. `lib/pages/subscription.dart` 的订阅地址错了两条 —— 原来列 `/sub/all.txt`（内核从不写这个文件，
+   全仓唯一出现是 `kernel/app/server.go:69` 的 StaticFile → 必 404）与 `/all.yaml`（标成「规则模板」
+   实际是节点列表，`kernel/save/save.go:72` `method.SaveToLocal(allYamlData, "all.yaml")`）。
+   改法：`/all.txt`、`/mihomo.yaml` 都依赖 Sub-Store，本 App 未启用，直接删；只留 `节点列表 (all.yaml)`，
+   并在说明里补「需要完整配置或 Base64 请用上面的导出功能」。
+2. `lib/src/api.dart:71-78` `serverLogs()` 直接 `return r.body`，而内核 `getLogs` 返回的是
+   `c.JSON(200, gin.H{"logs": lines})`（`kernel/app/server.go:344-359`）→ 日志页 HTTP 分页显示 JSON 原文。
+   改法：`jsonDecode` 后取 `logs` 数组用 `\n` 拼接，解析失败回落纯文本（兼容老内核）。
+3. `lib/pages/settings.dart` 「忽略电池优化」ListTile 没有 onTap（Manifest 里却声明了
+   `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`）。改法：新增原生方法 `batteryStatus`（`PowerManager
+   .isIgnoringBatteryOptimizations`）与 `requestBattery`（优先 `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`，
+   失败退 `ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS`），设置页加 `WidgetsBindingObserver`，
+   回前台时（`AppLifecycleState.resumed`）重查并刷新勾选状态。
+4. `lib/src/disclaimer.dart` 注释称「启动时首次提示共用同一份文案」，实际只有设置页一个调用点，
+   首启不弹免责声明。改法：`showDisclaimerDialog(context, requireAccept: true)` 增加 `PopScope(canPop: false)`
+   与「不同意 / 同意并继续」两个按钮，`lib/main.dart` 用 `addPostFrameCallback` + `Native.disclaimerSeen()`
+   判断首次启动，同意后 `Native.markDisclaimerSeen()`（`SharedPreferences("subscheck")` 的 `disclaimer_seen`），
+   不同意则 `SystemNavigator.pop()` 退出且不写标记（下次仍会问）。
+5. 分享与 SAF 自定义目录冲突：`ExportStore.saveToTree` 返回的是 `treeLabel + "/" + name` 拼接串
+   （`ExportStore.kt:259`），磁盘上并不存在，`share_plus` 会把它 `copyTo` 到自己的 cache → FileNotFoundException。
+   改法：新增原生方法 `shareCopy`（写 `cacheDir/share/<name>` 并返回真实绝对路径），
+   订阅页所有分享（导出后自动分享、「已导出」卡片的分享按钮）统一改走它。
+
+**建议项**
+
+- 媒体检测阶段原来在 UI 上完全隐身（`mediaDone`/`alivePass` 只在 `models.dart` 出现）。
+  改法：`KernelStatus` 新增 `mediaTotal => alivePass`、`mediaRatio`、`hasMediaCheck`，
+  概览页在测活与测速之间加第三段进度条「媒体检测 x/y」。
+- 订阅页节点数量只在 `initState` 数一次，检测完成后数字不更新。改法：监听 `AppState`，
+  `checkedAt` 变化时重数（`_countedAt` + `_counting` 防重入）。
+- `lib/pages/nodes.dart` 「只看有速度」用 `n.speed > 0`，与「可用」不等价 —— 未开测速时 speed 全为 0，
+  一开筛选列表就空。改法：仅在 `status.hasSpeedTest` 时才应用该过滤。
+- `NodeItem` 完全没有解析内核 `results.json` 里的 `details` 数组（`kernel/save/results.go` 的
+  `NodeDetail{Key,Value}`，白名单 19 项：cipher/flow/alpn/ws-path/grpc-service-name/plugin 等）。
+  改法：新增 `NodeDetail` 模型并解析，节点详情弹窗逐条展示；弹窗内容改为可滚动。
+- `lib/pages/logs.dart` 的 3 秒定时器无条件常驻。改法：只在「HTTP」分页时启动，切回「内核」即取消。
+- `lib/pages/settings.dart` 的 `_host/_port` 控制器在 `initState` 定型、不随 `AppState` 变化。
+  改法：加 `FocusNode` 并在 `AppState` 监听里同步（正在编辑时不覆盖用户输入）。
+- 导出 mihomo 配置缺 `port/mode/dns`：`assets/ACL4SSR_Online_Full.yaml` 第一行就是 `proxy-groups:`，
+  拼出来的配置没有顶层基础键。改法：`lib/src/exporter.dart` 新增 `_base` 常量（mixed-port 7890、
+  mode rule、fake-ip DNS），`buildMihomo` 输出「基础段 + proxies + 模板」。
+
+**性能与清理**
+
+- `lib/pages/home.dart` 原用 `AnimatedBuilder` 包住整个 `Scaffold` + `IndexedStack`，每 2 秒重建五页。
+  改法：删掉外层 `AnimatedBuilder`，五个页面各自 `build()` 返回 `AnimatedBuilder`，
+  并把原 `build` 改名为 `_body`。
+- `lib/src/app_state.dart`：`initialize()` 换 `api` 前先 `api?.dispose()`（否则旧 HttpClient 泄漏）；
+  `refresh()` 里 `Native.status()` 从每 2 秒都调改为每 5 个周期一次（`_tick % 5`）；
+  `notifyListeners()` 改为先比对快照签名 `_snapshotChanged()`，无变化不通知；
+  删掉命名骗人的 `copyWithZero()` 扩展（实为返回 `KernelStatus.empty`），直接写 `status = KernelStatus.empty`；
+  `KernelStatus` 补 `operator ==` / `hashCode`。
+- 删死代码：`lib/src/api.dart` 的 `ping()` / `config()` / `saveConfig()`（无调用方）；
+  `pubspec.yaml` 去掉 `http ^1.2.2` 与 `yaml ^3.1.2`（`grep package:http|package:yaml` 在 `lib/` 下零命中），
+  `lib/pages/about.dart:398` 的依赖文案同步改为「Flutter、share_plus、cupertino_icons」。
+
+**验证与产物**
+
+- `flutter analyze` → No issues found（修掉一处 `use_build_context_synchronously`：
+  `lib/main.dart` 里原来用 `mounted` 校验另一个 `BuildContext`，改为 `ctx.mounted`）。
+- `flutter test` → **6 passed**（新增「媒体检测分母是测活通过数（alivePass）」与「NodeItem 解析 details 数组」）。
+- 产物（aapt2 核验 versionCode 9 / versionName 1.2.6 / minSdk 24 / targetSdk 28，native-code 分别为
+  arm64-v8a 与 armeabi-v7a）：
+  - `dist/SubsCheck-1.2.6-arm64-v8a.apk` 34,441,529 B，sha256 `622182e55d845c9897e9d4ae955c2da555a3cbc64b4364a4f875186171214c86`
+  - `dist/SubsCheck-1.2.6-armeabi-v7a.apk` 34,358,285 B，sha256 `6318a8b5fdf378d6950c8f012a7e3d70367452275df7d7d155e4c5c90b300ebb`
+- 按用户要求（m05728）本轮只出包，**未发布 Release**。
 
 ### 1.2.5：高级卡片精简 + 订阅页去掉导出文件位置（2026-11-14，未在模拟器复测）
 

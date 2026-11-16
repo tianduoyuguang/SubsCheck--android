@@ -395,7 +395,7 @@ class _AboutPageState extends State<AboutPage> {
                 ListTile(
                   leading: const Icon(Icons.description_outlined),
                   title: const Text('第三方组件'),
-                  subtitle: const Text('Flutter、yaml、http、share_plus、cupertino_icons'),
+                  subtitle: const Text('Flutter、share_plus、cupertino_icons'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => showLicensePage(
                     context: context,

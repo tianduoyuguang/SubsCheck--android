@@ -70,8 +70,49 @@ class KernelStatus {
   /// 早期 filterPass 还没涨起来（0）时回落到 available，避免显示 0/0。
   int get speedTotal => filterPass > 0 ? filterPass : available;
 
+  /// 媒体检测阶段的总数：只有测活通过的节点才会进入这一阶段。
+  int get mediaTotal => alivePass;
+
   double get aliveRatio => proxyCount <= 0 ? 0 : aliveDone / proxyCount;
+  double get mediaRatio => mediaTotal <= 0 ? 0 : mediaDone / mediaTotal;
   double get speedRatio => speedTotal <= 0 ? 0 : speedDone / speedTotal;
+
+  /// 是否跑过媒体检测（内核只有开了 media-check 才会累加 mediaDone）。
+  bool get hasMediaCheck => mediaDone > 0;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is KernelStatus &&
+          other.checking == checking &&
+          other.proxyCount == proxyCount &&
+          other.available == available &&
+          other.progress == progress &&
+          other.phase == phase &&
+          other.aliveDone == aliveDone &&
+          other.alivePass == alivePass &&
+          other.mediaDone == mediaDone &&
+          other.filterPass == filterPass &&
+          other.speedDone == speedDone &&
+          other.speedPass == speedPass &&
+          other.hasSpeedTest == hasSpeedTest;
+
+  @override
+  int get hashCode => Object.hash(checking, proxyCount, available, progress, phase,
+      aliveDone, alivePass, mediaDone, filterPass, speedDone, speedPass, hasSpeedTest);
+}
+
+/// results.json 里指标的附加参数（cipher / ws-path / plugin ...），
+/// 由内核 save.NodeRecord.Details 白名单产出。
+class NodeDetail {
+  const NodeDetail({required this.key, required this.value});
+  final String key;
+  final String value;
+
+  factory NodeDetail.fromJson(Map<String, dynamic> j) => NodeDetail(
+        key: (j['k'] ?? '').toString(),
+        value: (j['v'] ?? '').toString(),
+      );
 }
 
 /// /api/results 里的单个节点。
@@ -93,6 +134,7 @@ class NodeItem {
     required this.ipRisk,
     required this.subTag,
     required this.media,
+    required this.details,
   });
 
   final String name;
@@ -111,6 +153,7 @@ class NodeItem {
   final String ipRisk;
   final String subTag;
   final List<String> media;
+  final List<NodeDetail> details;
 
   factory NodeItem.fromJson(Map<String, dynamic> j) {
     String str(dynamic v) => v == null ? '' : v.toString();
@@ -120,6 +163,16 @@ class NodeItem {
     if (m is List) {
       for (final e in m) {
         if (e is Map && (e['tag'] ?? '') != '') media.add(e['tag'].toString());
+      }
+    }
+    final d = j['details'];
+    final details = <NodeDetail>[];
+    if (d is List) {
+      for (final e in d) {
+        if (e is Map) {
+          final det = NodeDetail.fromJson(e.map((k, v) => MapEntry(k.toString(), v)));
+          if (det.key.isNotEmpty && det.value.isNotEmpty) details.add(det);
+        }
       }
     }
     return NodeItem(
@@ -139,6 +192,7 @@ class NodeItem {
       ipRisk: str(j['ipRisk']),
       subTag: str(j['subTag']),
       media: media,
+      details: details,
     );
   }
 

@@ -17,22 +17,47 @@ class SubscriptionPage extends StatefulWidget {
 class _SubscriptionPageState extends State<SubscriptionPage> {
   int nodeCount = 0;
   String? lastPath;
+  String? lastName;
+  String? lastContent;
   bool busy = false;
   String? err;
+
+  /// 上一次统计节点数时的检测时间戳；变化说明结果文件换了，要重新数。
+  String _countedAt = '';
+  bool _counting = false;
 
   @override
   void initState() {
     super.initState();
+    widget.state.addListener(_onStateChanged);
+    _reloadCount();
+  }
+
+  @override
+  void dispose() {
+    widget.state.removeListener(_onStateChanged);
+    super.dispose();
+  }
+
+  void _onStateChanged() {
+    final at = widget.state.checkedAt;
+    if (at == _countedAt || _counting) return;
     _reloadCount();
   }
 
   Future<void> _reloadCount() async {
     final api = widget.state.api;
     if (api == null) return;
-    final all = await api.allYaml();
-    if (all == null) return;
-    final n = Exporter.countProxies(Exporter.proxiesBlock(all));
-    if (mounted) setState(() => nodeCount = n);
+    _counting = true;
+    try {
+      final all = await api.allYaml();
+      if (all == null) return;
+      final n = Exporter.countProxies(Exporter.proxiesBlock(all));
+      _countedAt = widget.state.checkedAt;
+      if (mounted) setState(() => nodeCount = n);
+    } finally {
+      _counting = false;
+    }
   }
 
   Future<void> _export({required bool full}) async {
@@ -54,14 +79,31 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
       widget.state.applyExportInfo(r);
       setState(() {
         lastPath = path;
+        lastName = name;
+        lastContent = content;
         nodeCount = Exporter.countProxies(Exporter.proxiesBlock(all));
       });
-      if (!mounted) return;
-      await Share.shareXFiles(<XFile>[XFile(path)], text: 'SubsCheck 导出 $name');
+      // 自定义目录（SAF）下 saveExport 返回的是文档 URI 拼出来的展示路径，
+      // 磁盘上并不存在这个文件，直接交给分享面板会 FileNotFoundException。
+      // 所以分享统一走一份 cacheDir 里的临时副本。
+      await _share(name, content);
     } catch (e) {
       setState(() => err = e.toString());
     } finally {
       if (mounted) setState(() => busy = false);
+    }
+  }
+
+  /// 分享一份真实存在的副本（导出目录是 SAF 文档时原路径不可读）。
+  Future<void> _share(String name, String content) async {
+    try {
+      final r = await Native.shareCopy(name, content);
+      final real = (r['path'] ?? '') as String;
+      if (real.isEmpty) return;
+      if (!mounted) return;
+      await Share.shareXFiles(<XFile>[XFile(real)], text: 'SubsCheck 导出 $name');
+    } catch (e) {
+      if (mounted) setState(() => err = '分享失败：$e');
     }
   }
 
@@ -74,11 +116,17 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
 
   @override
   Widget build(BuildContext context) {
+    return AnimatedBuilder(
+        animation: widget.state, builder: (context, _) => _body(context));
+  }
+
+  Widget _body(BuildContext context) {
     final base = widget.state.api?.baseUrl ?? 'http://127.0.0.1:${widget.state.port}';
+    // 内核在 Sub-Store 关闭时只会写 all.yaml 这一个产物（kernel/save/save.go），
+    // /all.txt 与 /mihomo.yaml 都依赖 Sub-Store，本 App 没有启用，
+    // 所以这里只列真实存在的地址，免得用户复制过去是 404。
     final urls = <MapEntry<String, String>>[
       MapEntry<String, String>('节点列表 (all.yaml)', '$base/sub/all.yaml'),
-      MapEntry<String, String>('Base64 订阅 (all.txt)', '$base/sub/all.txt'),
-      MapEntry<String, String>('规则模板 (ACL4SSR)', '$base/all.yaml'),
     ];
     return RefreshIndicator(
       onRefresh: _reloadCount,
@@ -139,30 +187,34 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
                 subtitle: SelectableText(lastPath!),
                 trailing: IconButton(
                   icon: const Icon(Icons.share),
-                  onPressed: () => Share.shareXFiles(<XFile>[XFile(lastPath!)]),
+                  // 同样走临时副本：自定义目录下 lastPath 只是展示用的拼接路径。
+                  onPressed: (lastName == null || lastContent == null)
+                      ? null
+                      : () => _share(lastName!, lastContent!),
                 ),
               ),
             ),
           const SizedBox(height: 16),
           Text('本机订阅地址', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
-          Text('在其他客户端里可直接填这些地址（仅本机 / 同一网络下可访问，取决于监听地址）。',
+          Text('在其他客户端里可直接填这些地址（仅本机 / 同一网络下可访问，取决于监听地址）。'
+              '这是纯节点列表；需要带分流规则的完整配置或 Base64 订阅，请用上面的导出功能生成文件。',
               style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: 8),
           Card(
             child: Column(
               children: <Widget>[
-                for (final e in urls) ...<Widget>[
+                for (var i = 0; i < urls.length; i++) ...<Widget>[
                   ListTile(
                     dense: true,
-                    title: Text(e.key),
-                    subtitle: SelectableText(e.value, style: const TextStyle(fontSize: 12)),
+                    title: Text(urls[i].key),
+                    subtitle: SelectableText(urls[i].value, style: const TextStyle(fontSize: 12)),
                     trailing: IconButton(
                       icon: const Icon(Icons.copy, size: 18),
-                      onPressed: () => _copyUrl(e.value),
+                      onPressed: () => _copyUrl(urls[i].value),
                     ),
                   ),
-                  const Divider(height: 1),
+                  if (i != urls.length - 1) const Divider(height: 1),
                 ],
               ],
             ),

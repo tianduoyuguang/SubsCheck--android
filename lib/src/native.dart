@@ -41,6 +41,32 @@ class Native {
   static Future<Map<String, dynamic>> saveExport(String name, String content) =>
       _call('saveExport', <String, dynamic>{'name': name, 'content': content});
 
+  /// 把内容写到一份真实存在的缓存副本并返回路径（分享用）。
+  /// 自定义目录（SAF）下 saveExport 返回的是展示用的拼接路径，磁盘上并没有这个文件。
+  static Future<Map<String, dynamic>> shareCopy(String name, String content) =>
+      _call('shareCopy', <String, dynamic>{'name': name, 'content': content});
+
+  /// 是否已在系统「忽略电池优化」白名单里。
+  static Future<bool> ignoringBattery() async {
+    final r = await _call('batteryStatus');
+    return r['ignoring'] == true;
+  }
+
+  /// 打开系统的电池优化设置（优先直接弹本应用的授权框）。
+  static Future<void> requestIgnoreBattery() async {
+    await _call('requestBattery');
+  }
+
+  /// 首启免责声明是否已经确认过。
+  static Future<bool> disclaimerSeen() async {
+    final r = await _call('disclaimerSeen');
+    return r['seen'] == true;
+  }
+
+  static Future<void> markDisclaimerSeen() async {
+    await _call('setDisclaimerSeen');
+  }
+
   /// 当前导出目录配置：mode / label / path / privatePath / downloadPath /
   /// hasTree / storageGranted / needsPermission。
   static Future<Map<String, dynamic>> exportInfo() => _call('exportInfo');

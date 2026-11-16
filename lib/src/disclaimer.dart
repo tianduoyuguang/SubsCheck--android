@@ -26,24 +26,43 @@ const String kDisclaimer = '''
 ''';
 
 /// 可滚动的免责声明对话框。
-Future<void> showDisclaimerDialog(BuildContext context) {
-  return showDialog<void>(
+///
+/// [requireAccept] 为 true 时用于首次启动：用户必须点「同意并继续」才能进入，
+/// 返回 true 表示已同意；false 时是设置页里的纯阅读弹窗，总是返回 false。
+Future<bool> showDisclaimerDialog(BuildContext context, {bool requireAccept = false}) async {
+  final ok = await showDialog<bool>(
     context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('免责声明'),
-      content: SizedBox(
-        width: double.maxFinite,
-        height: 460,
-        child: SingleChildScrollView(
-          child: SelectableText(
-            kDisclaimer.trim(),
-            style: const TextStyle(fontSize: 12.5, height: 1.55),
+    barrierDismissible: !requireAccept,
+    builder: (ctx) => PopScope(
+      // 首启弹窗不允许返回键绕过。
+      canPop: !requireAccept,
+      child: AlertDialog(
+        title: const Text('免责声明'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 460,
+          child: SingleChildScrollView(
+            child: SelectableText(
+              kDisclaimer.trim(),
+              style: const TextStyle(fontSize: 12.5, height: 1.55),
+            ),
           ),
         ),
+        actions: <Widget>[
+          if (requireAccept) ...<Widget>[
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('不同意'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('同意并继续'),
+            ),
+          ] else
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('关闭')),
+        ],
       ),
-      actions: <Widget>[
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('关闭')),
-      ],
     ),
   );
+  return ok == true;
 }

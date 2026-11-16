@@ -48,6 +48,9 @@ class AppState extends ChangeNotifier {
       final template = await rootBundle.loadString('assets/config_template.yaml');
       final prepared = await Native.prepare(template);
       info = prepared;
+      // 重新初始化（例如改了监听地址）会换一个 HttpClient，旧的必须关掉，
+      // 否则每次改端口都泄漏一个连接池。
+      api?.dispose();
       api = KernelApi(
         host: (prepared['host'] ?? '127.0.0.1') as String,
         port: (prepared['port'] is int) ? prepared['port'] as int : 8199,
@@ -129,14 +132,19 @@ class AppState extends ChangeNotifier {
     final a = api;
     if (a == null) return;
     try {
-      final st = await Native.status();
-      kernelRunning = st['running'] == true;
+      // 内核进程存活状态只在一轮检测结束/开始时才会变，没必要每 2 秒跨一次
+      // MethodChannel（那是一次主线程到工作线程的往返）；5 个轮询周期查一次够用。
+      if (!silent || _tick % 5 == 0 || !_kernelBootstrapped) {
+        final st = await Native.status();
+        kernelRunning = st['running'] == true;
+        _kernelBootstrapped = true;
+      }
       final s = await a.status();
       final wasChecking = status.checking;
       if (s != null) {
         status = KernelStatus.fromJson(s);
       } else {
-        status = status.copyWithZero();
+        status = KernelStatus.empty;
       }
       // 轮询是 silent 的，但一轮检测刚结束时必须把结果拉回来，
       // 否则节点页永远停在旧数据（或空列表）。
@@ -163,7 +171,38 @@ class AppState extends ChangeNotifier {
     } catch (e) {
       // 内核可能刚启动还没监听端口，静默忽略
     }
-    notifyListeners();
+    _tick++;
+    // 只有真的发生变化才通知，避免每 2 秒把五页 UI 全量重建一次。
+    if (_snapshotChanged()) {
+      notifyListeners();
+    }
+  }
+
+  /// 上一条通知时的快照，用来判断这一轮轮询到底有没有新信息。
+  String _lastSig = '';
+  int _tick = 0;
+  bool _kernelBootstrapped = false;
+
+  bool _snapshotChanged() {
+    final sig = <String>[
+      status.checking.toString(),
+      status.proxyCount.toString(),
+      status.available.toString(),
+      status.aliveDone.toString(),
+      status.mediaDone.toString(),
+      status.filterPass.toString(),
+      status.speedDone.toString(),
+      status.speedPass.toString(),
+      kernelRunning.toString(),
+      nodes.length.toString(),
+      checkedAt,
+      kernelVersion,
+      kernelLog.length.toString(),
+      error ?? '',
+    ].join('|');
+    if (sig == _lastSig) return false;
+    _lastSig = sig;
+    return true;
   }
 
   Future<void> triggerCheck() async {
@@ -206,6 +245,3 @@ class AppState extends ChangeNotifier {
   }
 }
 
-extension _Zero on KernelStatus {
-  KernelStatus copyWithZero() => KernelStatus.empty;
-}
