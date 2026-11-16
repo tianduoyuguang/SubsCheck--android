@@ -227,6 +227,33 @@ export PATH=$JAVA_HOME/bin:$PATH
 - 产物：`SubsCheck-1.2.4-arm64-v8a.apk`（34,434,513 B，sha256 `40270ab0…5177`）、
   `SubsCheck-1.2.4-armeabi-v7a.apk`（34,349,845 B，sha256 `30ce7f86…48e`），versionCode 7。
 
+### 1.2.6：测速进度分母改为可用节点数（2026-11-16，MuMu x86_64 release 包）
+
+用户反馈（m06201 原文）：「运行时的测速进度应该是已测速/可用节点，而不是已测速/节点总数」。
+
+- 现象：概览页「测速进度 61/19883」——分母是订阅节点总数，进度条几乎不动。
+  实际进入测速的只有通过测活 + 媒体检测 + 过滤的节点（内核 `pipeline.filterPass`）。
+- 内核侧数据早就有了：`kernel/app/server.go:311-319` 的 `pipeline` 对象里
+  `total` / `aliveDone` / `alivePass` / `mediaDone` / `filterPass` / `speedDone` / `speedPass`。
+  三段流水线的总数是级联的：测活对 `total`、媒体对 `alivePass`、测速对 `filterPass`
+  （见 `kernel/check/check.go:316-325` 的 `SavePhaseResult` 与
+  `kernel/check/progress.go:120-122` 的 `formatStageLine("测速", speedDone, filterPass, ...)`）。
+  App 只用了 `speedDone` 与 `proxyCount`，分母取错了。
+- 改法：
+  - `lib/src/models.dart` 新增 `int get speedTotal => filterPass > 0 ? filterPass : available;`
+    （filterPass 还没涨起来时回落到 available，避免显示 0/0），
+    `speedRatio` 从 `speedDone / proxyCount` 改为 `speedDone / speedTotal`。
+  - `lib/pages/overview.dart:105` 文案改为 `'测速进度 ${st.speedDone}/${st.speedTotal}'`。
+  - 未配置 filter、未开媒体检测时 `filterPass == available`，也就是概览页「可用节点」那一格，
+    与用户描述的「已测速/可用节点」一致；配了 filter 时分母是过滤后的数量，语义仍正确。
+- 验证：起了一个本地假内核（Node 写的 8199 服务，返回 proxyCount=19883 / available=297 /
+  filterPass=174 / speedDone=61），`adb reverse tcp:8199 tcp:8199` 转发进模拟器，
+  概览页实测显示 **「测速进度 61/174」**；改前同一份数据会显示 61/19883。
+- 单测：`test/widget_test.dart` 新增两条 —— 「测速进度分母是可用节点数（filterPass）」断言
+  speedTotal=55、speedRatio=40/55；「filterPass 还没涨起来时回落到 available」断言 speedTotal=42。
+  `flutter analyze` → No issues found；`flutter test` → **4 passed**。
+- 产物：versionCode 9 / versionName 1.2.6。
+
 ### 1.2.5：高级卡片精简 + 订阅页去掉导出文件位置（2026-11-14，未在模拟器复测）
 
 用户要求（m05728 原文）：「app里设置-高级 里的内核二进制与工作目录删掉」；

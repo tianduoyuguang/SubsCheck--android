@@ -24,10 +24,10 @@ Windows 版 SubsCheck 依赖 proot / Termux 那套才能上安卓。本 App 换�
 
 | 包 | 适用 | SHA-256 |
 |---|---|---|
-| `SubsCheck-1.2.5-arm64-v8a.apk` | 2018 年之后绝大多数手机 | `e3600485e164f5dad9743461ca42cbda4a612c47d952a4f513a3f1a9ba08a1eb` |
-| `SubsCheck-1.2.5-armeabi-v7a.apk` | 老 32 位设备 | `99fa0afdc5004ea42d9e6288b5f1e43c6e4d667d833554cefbba536a75458fb2` |
+| `SubsCheck-1.2.6-arm64-v8a.apk` | 2018 年之后绝大多数手机 | `d4d012bae3115b7aa647cf24b31ff2d4a751725b0dfaa64d6a44a8a827927c8d` |
+| `SubsCheck-1.2.6-armeabi-v7a.apk` | 老 32 位设备 | `eb51d8ac5c4692e94ea7caca78e6c863f025c4ed467e3889a91576c9fc23511c` |
 
-`minSdkVersion` = 24（Android 7.0），`targetSdkVersion` = 28，`versionName` = 1.2.5。
+`minSdkVersion` = 24（Android 7.0），`targetSdkVersion` = 28，`versionName` = 1.2.6。
 
 > **安装时提示「未经验证的开发者 / 无开发者认证」是正常的，直接继续安装即可。**
 > 系统从 Android 16 QPR2 起内置了开发者身份校验，会核对包名是否登记过开发者身份。

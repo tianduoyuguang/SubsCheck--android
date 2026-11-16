@@ -102,7 +102,7 @@ class OverviewPage extends StatelessWidget {
                   if (st.hasSpeedTest) ...<Widget>[
                     LinearProgressIndicator(value: st.speedRatio.clamp(0.0, 1.0)),
                     const SizedBox(height: 6),
-                    Text('测速进度 ${st.speedDone}/${st.proxyCount}', style: Theme.of(context).textTheme.bodySmall),
+                    Text('测速进度 ${st.speedDone}/${st.speedTotal}', style: Theme.of(context).textTheme.bodySmall),
                   ],
                 ],
               ),

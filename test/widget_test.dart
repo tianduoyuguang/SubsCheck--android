@@ -55,4 +55,34 @@ void main() {
     expect(n.speedText, contains('MB/s'));
     expect(n.media.length, 1);
   });
+
+  test('测速进度分母是可用节点数（filterPass），不是订阅节点总数', () {
+    final s = KernelStatus.fromJson(<String, dynamic>{
+      'proxyCount': 120,
+      'available': 42,
+      'pipeline': <String, dynamic>{
+        'total': 120,
+        'aliveDone': 120,
+        'alivePass': 42,
+        'mediaDone': 42,
+        'filterPass': 55,
+        'speedDone': 40,
+        'speedPass': 20,
+      },
+      'hasSpeedTest': true,
+    });
+    expect(s.speedTotal, 55);
+    expect(s.speedRatio, closeTo(40 / 55, 1e-9));
+  });
+
+  test('filterPass 还没涨起来时回落到 available，避免 0/0', () {
+    final s = KernelStatus.fromJson(<String, dynamic>{
+      'proxyCount': 120,
+      'available': 42,
+      'pipeline': <String, dynamic>{'filterPass': 0, 'speedDone': 0},
+      'hasSpeedTest': true,
+    });
+    expect(s.speedTotal, 42);
+    expect(s.speedRatio, 0);
+  });
 }

@@ -63,8 +63,15 @@ class KernelStatus {
     );
   }
 
+  /// 测速阶段的总数：进入测速的是「通过过滤的可用节点」
+  /// （内核 pipeline.filterPass），不是订阅里的节点总数。
+  /// 未配置 filter / 未开流媒体检测时 filterPass 等于 available，
+  /// 也就是概览页「可用节点」那个数字。
+  /// 早期 filterPass 还没涨起来（0）时回落到 available，避免显示 0/0。
+  int get speedTotal => filterPass > 0 ? filterPass : available;
+
   double get aliveRatio => proxyCount <= 0 ? 0 : aliveDone / proxyCount;
-  double get speedRatio => proxyCount <= 0 ? 0 : speedDone / proxyCount;
+  double get speedRatio => speedTotal <= 0 ? 0 : speedDone / speedTotal;
 }
 
 /// /api/results 里的单个节点。
