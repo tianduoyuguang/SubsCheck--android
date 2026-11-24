@@ -395,7 +395,12 @@ kernel/vendor/
 /dist/*.aab
 /dist/*.zip
 
-#web
-/subscheak-web/
+# ===== 生成的网站 =====
+# 网站源码在 subscheck-web/，它有自己的独立 git 仓库并推送到 GitHub。
+# app 仓库不重复收录；同时避免被误识别为嵌套仓库/子模块引用。
 /site/
+/subscheck-web/
+
+# 调试时的临时目录（无头浏览器用户数据等）
 /.edgetmp/
+/.tmpx/
