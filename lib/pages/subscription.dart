@@ -84,10 +84,58 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
         lastContent = content;
         nodeCount = Exporter.countProxies(Exporter.proxiesBlock(all));
       });
-      // 自定义目录（SAF）下 saveExport 返回的是文档 URI 拼出来的展示路径，
-      // 磁盘上并不存在这个文件，直接交给分享面板会 FileNotFoundException。
-      // 所以分享统一走一份 cacheDir 里的临时副本。
-      await _share(name, content);
+      // 导出只负责落盘，不自动弹系统分享面板：分享是单独的动作，
+      // 由「已导出」卡片右侧的分享按钮触发（见 _share）。
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('已保存到 $path'),
+        duration: const Duration(seconds: 4),
+        action: SnackBarAction(label: '分享', onPressed: () => _share(name, content)),
+      ));
+    } catch (e) {
+      setState(() => err = e.toString());
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  /// 拉系统「保存到…」对话框，由用户自己挑文件名和保存位置（Downloads、网盘等）。
+  /// 这条路径不经过导出目录设置，也不会弹分享面板。
+  Future<void> _saveAs({required bool full}) async {
+    final api = widget.state.api;
+    if (api == null) return;
+    setState(() {
+      busy = true;
+      err = null;
+    });
+    try {
+      final all = await api.allYaml();
+      if (all == null || all.trim().isEmpty) {
+        throw StateError('拿不到 /sub/all.yaml，请先运行内核并完成一轮检测');
+      }
+      final content = full ? await Exporter.buildMihomo(all) : Exporter.buildPlain(all);
+      final name = full ? 'mihomo.yaml' : 'proxies.yaml';
+      final r = await Native.saveExportAs(name, content);
+      if (r['canceled'] == true) {
+        setState(() => busy = false);
+        return;
+      }
+      if (r['ok'] != true) {
+        throw StateError((r['error'] ?? '保存失败') as String);
+      }
+      final path = (r['path'] ?? '') as String;
+      setState(() {
+        lastPath = path;
+        lastName = name;
+        lastContent = content;
+        nodeCount = Exporter.countProxies(Exporter.proxiesBlock(all));
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('已保存到 $path'),
+        duration: const Duration(seconds: 4),
+        action: SnackBarAction(label: '分享', onPressed: () => _share(name, content)),
+      ));
     } catch (e) {
       setState(() => err = e.toString());
     } finally {
@@ -146,7 +194,17 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
                   leading: const Icon(Icons.merge_type),
                   title: const Text('导出完整 mihomo 配置'),
                   subtitle: Text('节点 + 分流规则 + 规则集，可直接导入 Clash/Mihomo 客户端'),
-                  trailing: const Icon(Icons.chevron_right),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      IconButton(
+                        icon: const Icon(Icons.save_alt),
+                        tooltip: '另存为…',
+                        onPressed: busy ? null : () => _saveAs(full: true),
+                      ),
+                      const Icon(Icons.chevron_right),
+                    ],
+                  ),
                   enabled: !busy,
                   onTap: () => _export(full: true),
                 ),
@@ -155,7 +213,17 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
                   leading: const Icon(Icons.list_alt),
                   title: const Text('导出仅节点配置'),
                   subtitle: const Text('proxies 列表，用于导入到已有配置或订阅转换'),
-                  trailing: const Icon(Icons.chevron_right),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      IconButton(
+                        icon: const Icon(Icons.save_alt),
+                        tooltip: '另存为…',
+                        onPressed: busy ? null : () => _saveAs(full: false),
+                      ),
+                      const Icon(Icons.chevron_right),
+                    ],
+                  ),
                   enabled: !busy,
                   onTap: () => _export(full: false),
                 ),

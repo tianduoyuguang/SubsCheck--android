@@ -41,6 +41,11 @@ class Native {
   static Future<Map<String, dynamic>> saveExport(String name, String content) =>
       _call('saveExport', <String, dynamic>{'name': name, 'content': content});
 
+  /// 拉系统「保存到…」对话框（ACTION_CREATE_DOCUMENT），由用户自己挑文件名和位置。
+  /// 返回 ok / canceled / path；用户取消时 ok=false 且 canceled=true。
+  static Future<Map<String, dynamic>> saveExportAs(String name, String content) =>
+      _call('saveExportAs', <String, dynamic>{'name': name, 'content': content});
+
   /// 把内容写到一份真实存在的缓存副本并返回路径（分享用）。
   /// 自定义目录（SAF）下 saveExport 返回的是展示用的拼接路径，磁盘上并没有这个文件。
   static Future<Map<String, dynamic>> shareCopy(String name, String content) =>

@@ -21,6 +21,7 @@ class MainActivity : FlutterActivity() {
         private const val REQ_NOTIF = 9001
         private const val REQ_STORAGE = 9002
         const val REQ_TREE = 9003
+        private const val REQ_SAVE = 9004
         private const val PREFS = "subscheck"
         private const val KEY_DISCLAIMER = "disclaimer_seen"
         private const val KEY_UPDATE_SKIP = "update_skip_version"
@@ -34,6 +35,12 @@ class MainActivity : FlutterActivity() {
     private var pending: MethodChannel.Result? = null
     private var channel: MethodChannel? = null
 
+    // 系统「保存到…」对话框（ACTION_CREATE_DOCUMENT）是异步返回的，
+    // 这里记住待写的内容和待回的 MethodChannel 结果，等 onActivityResult 再兑现。
+    private var pendingSaveResult: MethodChannel.Result? = null
+    private var pendingSaveName: String = ""
+    private var pendingSaveContent: String = ""
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         val km = KernelManager.get(this)
@@ -43,6 +50,13 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun runAsync(call: MethodCall, result: MethodChannel.Result) {
+        // 「另存为…」要等系统保存对话框返回，不能放进工作线程同步兑现。
+        if (call.method == "saveExportAs") {
+            val name = call.argument<String>("name") ?: "export.yaml"
+            val content = call.argument<String>("content") ?: ""
+            launchSaveDocument(name, content, result)
+            return
+        }
         pool.execute {
             val out: Map<String, Any?> = try {
                 dispatch(call)
@@ -312,6 +326,58 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    /**
+     * 拉系统「保存到…」对话框（SAF ACTION_CREATE_DOCUMENT）。
+     * 与 ACTION_OPEN_DOCUMENT_TREE 不同，这里用户可以自己挑文件名和目标位置，
+     * 默认目录是「下载」，选完把内容写进返回的 URI。
+     */
+    private fun launchSaveDocument(name: String, content: String, result: MethodChannel.Result) {
+        if (pendingSaveResult != null) {
+            result.error("busy", "另一个保存对话框还开着", null)
+            return
+        }
+        pendingSaveResult = result
+        pendingSaveName = name
+        pendingSaveContent = content
+        runOnUiThread {
+            try {
+                val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = ExportStore.mimeFor(name)
+                    putExtra(Intent.EXTRA_TITLE, name)
+                    addFlags(
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                            Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+                            Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                    )
+                }
+                startActivityForResult(intent, REQ_SAVE)
+            } catch (e: Exception) {
+                Log.w(TAG, "launch save document: " + e.message)
+                finishPendingSave(
+                    mapOf(
+                        "ok" to false,
+                        "canceled" to true,
+                        "error" to ("系统没有可用的保存对话框：" + (e.message ?: ""))
+                    )
+                )
+            }
+        }
+    }
+
+    /** 兑现挂起的「另存为」结果；只能调一次。 */
+    private fun finishPendingSave(payload: Map<String, Any?>) {
+        val r = pendingSaveResult ?: return
+        pendingSaveResult = null
+        val content = pendingSaveContent
+        val name = pendingSaveName
+        pendingSaveContent = ""
+        pendingSaveName = ""
+        runOnUiThread { r.success(payload) }
+        Log.i(TAG, "save as finished: " + name + " -> " + payload["path"])
+        if (content.isEmpty()) Log.w(TAG, "save as: empty content")
+    }
+
     private fun requestStoragePermissionIfNeeded() {
         if (Build.VERSION.SDK_INT < 23) return
         if (ExportStore.hasStoragePermission(this)) return
@@ -343,6 +409,10 @@ class MainActivity : FlutterActivity() {
      */
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQ_SAVE) {
+            handleSaveDocumentResult(resultCode, data)
+            return
+        }
         if (requestCode != REQ_TREE) return
         val uri = data?.data
         if (resultCode != RESULT_OK || uri == null) return
@@ -356,6 +426,43 @@ class MainActivity : FlutterActivity() {
         ExportStore.setTree(this, uri)
         Log.i(TAG, "export dir -> " + ExportStore.displayPath(this))
         channel?.invokeMethod("exportDirChanged", ExportStore.info(this))
+    }
+
+    /** 「另存为」对话框返回：把内容写进用户挑的文档 URI（新建或覆盖同名文档）。 */
+    private fun handleSaveDocumentResult(resultCode: Int, data: Intent?) {
+        val uri = data?.data
+        if (resultCode != RESULT_OK || uri == null) {
+            finishPendingSave(mapOf("ok" to false, "canceled" to true))
+            return
+        }
+        val name = pendingSaveName
+        val content = pendingSaveContent
+        val bytes = content.toByteArray(Charsets.UTF_8)
+        try {
+            // "wt" 先截断再写，避免旧内容比新内容长时留下尾巴。
+            contentResolver.openOutputStream(uri, "wt")?.use { it.write(bytes); it.flush() }
+                ?: throw java.io.IOException("无法打开所选位置")
+        } catch (e: Exception) {
+            Log.w(TAG, "write document: " + e.message)
+            try {
+                contentResolver.openOutputStream(uri)?.use { it.write(bytes); it.flush() }
+            } catch (e2: Exception) {
+                Log.w(TAG, "write document(retry): " + e2.message)
+                finishPendingSave(
+                    mapOf("ok" to false, "error" to ("写入失败：" + (e2.message ?: e2.toString())))
+                )
+                return
+            }
+        }
+        val shown = ExportStore.friendlyLabelFor(this, uri)
+        finishPendingSave(
+            mapOf(
+                "ok" to true,
+                "path" to shown,
+                "size" to bytes.size.toLong(),
+                "name" to name
+            )
+        )
     }
 
     private fun prefs() = getSharedPreferences(PREFS, MODE_PRIVATE)

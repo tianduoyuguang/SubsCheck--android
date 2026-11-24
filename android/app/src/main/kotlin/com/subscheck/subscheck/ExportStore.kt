@@ -72,6 +72,40 @@ object ExportStore {
         return if (rest.isEmpty()) base else base + "/" + rest
     }
 
+    /**
+     * 单个文档 URI（ACTION_CREATE_DOCUMENT 返回）翻译成人类可读路径。
+     * 外部存储的文档能拼出 /storage/emulated/0/...，其它 provider 退回显示名。
+     */
+    fun friendlyLabelFor(ctx: Context, uri: Uri): String {
+        if (uri.authority == "com.android.externalstorage.documents") {
+            val docId = try {
+                DocumentsContract.getDocumentId(uri)
+            } catch (e: Exception) {
+                ""
+            }
+            if (docId.isNotEmpty()) {
+                val volume = docId.substringBefore(':', "")
+                val rest = docId.substringAfter(':', "")
+                val base = when (volume) {
+                    "primary" -> "/storage/emulated/0"
+                    "home" -> "/storage/emulated/0/Documents"
+                    else -> "/storage/" + volume
+                }
+                return if (rest.isEmpty()) base else base + "/" + rest
+            }
+        }
+        val name = try {
+            var found = ""
+            ctx.contentResolver.query(
+                uri, arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null
+            )?.use { c -> if (c.moveToFirst()) found = c.getString(0) ?: "" }
+            found
+        } catch (e: Exception) {
+            ""
+        }
+        return if (name.isNotEmpty()) name else uri.toString()
+    }
+
     fun privateDir(ctx: Context): File {
         val root = ctx.getExternalFilesDir(null) ?: File(ctx.filesDir, "export")
         return File(root, "exports")
@@ -195,7 +229,7 @@ object ExportStore {
         return Saved("/storage/emulated/0/" + relDir + "/" + name, bytes.size.toLong())
     }
 
-    private fun mimeFor(name: String): String = when {
+    fun mimeFor(name: String): String = when {
         name.endsWith(".yaml", true) || name.endsWith(".yml", true) -> "text/yaml"
         name.endsWith(".txt", true) -> "text/plain"
         name.endsWith(".json", true) -> "application/json"

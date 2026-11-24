@@ -12,15 +12,15 @@
 
 | 文件 | 大小 | SHA-256 | 说明 |
 |---|---|---|---|
-| `dist/SubsCheck-1.2.7-arm64-v8a.apk` | 34,447,053 B (32.8MB) | `5ba36ad3b00dce802a0a823b9a2bc317a1dcd613de10e0d94001131a847ec11d` | arm64 真机 |
-| `dist/SubsCheck-1.2.7-armeabi-v7a.apk` | 34,365,169 B (32.8MB) | `3ec843133176f270723eeb5a5a13bfd26447e9777725972a04cb03c62f322248` | armv7 老机器 |
+| `dist/SubsCheck-1.2.8-arm64-v8a.apk` | 34,453,613 B (32.9MB) | `225b3a344648907a854cd514f1c554ccd6a6e9206ab08bae69bb6f5de2df0578` | arm64 真机 |
+| `dist/SubsCheck-1.2.8-armeabi-v7a.apk` | 34,368,989 B (32.8MB) | `c299dcb4fc67ef1882dde32395132cffab2ba689a4f2eb8b821463f3b6061ead` | armv7 老机器 |
 | `dist/README.md` / `dist/SHA256SUMS.txt` | — | — | 安装说明与校验 |
 
 `build/app/outputs/flutter-apk/app-x86_64-release-test.apk`（36.5MB）只用于模拟器验证，**不要分发**。
 
 发布签名 keystore 不纳入版本控制。请使用自己的签名密钥进行分发构建。
 
-- minSdk 24 / targetSdk 28 / versionCode 10 / versionName 1.2.7
+- minSdk 24 / targetSdk 28 / versionCode 11 / versionName 1.2.8
 - 应用图标已换成自绘的蓝色圆角对勾（5 个 mipmap 密度全覆盖），启动器实测正常。
 
 ## 架构
@@ -226,6 +226,47 @@ export PATH=$JAVA_HOME/bin:$PATH
 - `flutter analyze` → No issues found；`flutter test` → 2 passed。
 - 产物：`SubsCheck-1.2.4-arm64-v8a.apk`（34,434,513 B，sha256 `40270ab0…5177`）、
   `SubsCheck-1.2.4-armeabi-v7a.apk`（34,349,845 B，sha256 `30ce7f86…48e`），versionCode 7。
+
+### 1.2.8：导出不再自动弹分享面板 + 新增「另存为…」（2026-11-24，MuMu x86_64 release 包复测）
+
+用户反馈（m07646 原文）：「我点导出是出现的是分享页面，而不是保存文件的页面」。
+
+#### 根因
+
+`lib/pages/subscription.dart` 的 `_export()` 在 `Native.saveExport()` 落盘之后**无条件**调用
+`_share()` → `Share.shareXFiles()`，所以每次导出都会立即弹出系统分享面板。
+这个行为是 1.2.6 引入的：原本直接分享磁盘路径，在 SAF 自定义目录下该路径不可读会 FileNotFoundException，
+改成先写一份 cacheDir 副本后，自动弹分享这个动作被一并保留了下来。导出本该只负责保存。
+
+#### 改动
+
+- `_export()` 尾部去掉 `await _share(...)`，改为 SnackBar「已保存到 <path>」，右侧带一个「分享」按钮，
+  分享变成显式动作。
+- 新增 `_saveAs({required bool full})`：拉系统 `ACTION_CREATE_DOCUMENT` 对话框，由用户自己挑文件名和位置，
+  不经过导出目录设置，也不会弹分享面板。用户取消时静默返回（`canceled=true` 不报错）。
+- 两个导出 ListTile 的 `trailing` 从单个 chevron 改成 `Row`：`IconButton(Icons.save_alt, tooltip: '另存为…')` + chevron。
+- `lib/src/native.dart` 新增 `Native.saveExportAs(name, content)`。
+- `MainActivity.kt`：新增 `REQ_SAVE = 9004`、`pendingSaveResult/Name/Content` 三个字段、
+  `launchSaveDocument()` / `finishPendingSave()` / `handleSaveDocumentResult()`；
+  `runAsync()` 里对 `saveExportAs` 特判并 `return`（必须早于线程池，因为要等系统对话框返回）。
+- `ExportStore.kt`：`mimeFor()` 由 private 改 public；新增 `friendlyLabelFor(ctx, uri)`，
+  对 `com.android.externalstorage.documents` 用 `DocumentsContract.getDocumentId` 还原成 `/storage/emulated/0/...`。
+- 写入用 `openOutputStream(uri, "wt")` 先截断，避免覆盖已有文件时留旧尾巴。
+
+#### 实测（MuMu x86_64 / SDK 32 / Android 12）
+
+- 点「导出仅节点配置」行本身 → 不再弹 ChooserActivity，`topResumedActivity` 仍是 MainActivity，
+  直接落盘 `/storage/emulated/0/Download/SubsCheck/proxies.yaml`（255 B），SnackBar 显示「已保存到 …」。
+- 点行右侧「另存为…」→ `com.android.documentsui/.picker.PickActivity`，
+  默认落在 Documents，点「保存」后 `/storage/emulated/0/Documents/proxies.yaml`（255 B）内容正确。
+- 在 picker 里按返回键取消 → 回到 App，无任何错误提示，UI 保持原状（取消路径已验证）。
+- 连续导出两次同名文件 → MediaStore 命中已有行并 `update` 覆盖，**不产生 "proxies.yaml (1)"**。
+  注意：用 `adb shell rm` 直接删文件只会移除文件、留着 MediaStore 行，再导出会命中那条空行变成 `(1)`；
+  模拟器上清测试数据要用 `content delete --uri content://media/external/downloads --where ...`。
+- `flutter analyze` → No issues found；`flutter test` → 10 passed。
+- aapt2 核验：versionCode 11 / versionName 1.2.8 / minSdk 24 / targetSdk 28 / compileSdk 36。
+- 产物：`dist/SubsCheck-1.2.8-arm64-v8a.apk`（34,453,613 B，sha256 `225b3a34…0578`）、
+  `dist/SubsCheck-1.2.8-armeabi-v7a.apk`（34,368,989 B，sha256 `c299dcb4…1ead`）。
 
 ### 1.2.7：启动自动检查更新 + 订阅页新增导出自定义位置入口（2026-11-24，MuMu x86_64 release 包复测）
 
