@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../src/app_state.dart';
+import '../src/export_dir.dart';
 import '../src/exporter.dart';
 import '../src/native.dart';
 
@@ -157,6 +158,17 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
                   trailing: const Icon(Icons.chevron_right),
                   enabled: !busy,
                   onTap: () => _export(full: false),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.drive_file_move_outline),
+                  title: const Text('导出自定义位置'),
+                  subtitle: Text('当前：${widget.state.exportLabel}，点此可改到手机目录或自选文件夹'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () async {
+                    await showExportDirSheet(context, widget.state);
+                    if (mounted) setState(() {});
+                  },
                 ),
                 const Divider(height: 1),
                 ListTile(

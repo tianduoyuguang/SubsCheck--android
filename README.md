@@ -24,10 +24,10 @@ Windows 版 SubsCheck 依赖 proot / Termux 那套才能上安卓。本 App 换�
 
 | 包 | 适用 | SHA-256 |
 |---|---|---|
-| `SubsCheck-1.2.6-arm64-v8a.apk` | 2018 年之后绝大多数手机 | `622182e55d845c9897e9d4ae955c2da555a3cbc64b4364a4f875186171214c86` |
-| `SubsCheck-1.2.6-armeabi-v7a.apk` | 老 32 位设备 | `6318a8b5fdf378d6950c8f012a7e3d70367452275df7d7d155e4c5c90b300ebb` |
+| `SubsCheck-1.2.7-arm64-v8a.apk` | 2018 年之后绝大多数手机 | `5ba36ad3b00dce802a0a823b9a2bc317a1dcd613de10e0d94001131a847ec11d` |
+| `SubsCheck-1.2.7-armeabi-v7a.apk` | 老 32 位设备 | `3ec843133176f270723eeb5a5a13bfd26447e9777725972a04cb03c62f322248` |
 
-`minSdkVersion` = 24（Android 7.0），`targetSdkVersion` = 28，`versionName` = 1.2.6。
+`minSdkVersion` = 24（Android 7.0），`targetSdkVersion` = 28，`versionName` = 1.2.7。
 
 > **安装时提示「未经验证的开发者 / 无开发者认证」是正常的，直接继续安装即可。**
 > 系统从 Android 16 QPR2 起内置了开发者身份校验，会核对包名是否登记过开发者身份。
@@ -57,12 +57,17 @@ sha256sum -c SHA256SUMS.txt
 4. 「订阅」页导出：
    - **完整 mihomo 配置**：基础段（port/mode/dns）+ proxies + proxy-groups + rule-providers + rules（内置 ACL4SSR 模板）
    - **仅节点**：只有 proxies
-   导出位置由「设置 → 导出文件 → 导出目录」决定，默认 `Android/data/com.subscheck.subscheck/files/exports/`；
+   导出位置由「订阅 → 导出自定义位置」或「设置 → 导出文件 → 导出目录」决定（同一个开关），
+   默认 `Android/data/com.subscheck.subscheck/files/exports/`；
    可改成公共 `Download/SubsCheck` 或任意自选目录。导出后可直接分享给其他设备/clash 客户端。
 5. 「设置」里可以：
    - 改监听地址与端口（默认 `127.0.0.1:8199`）
    - 直接编辑 `config.yaml`（订阅源、并发、超时、测速阈值等都在这里）
    - 查看 API Key（外部工具调内核 HTTP API 用，头名 `X-API-Key`）
+   - 改导出目录、通知权限、忽略电池优化
+
+启动时会自动静默检查一次新版本：发现更新会弹窗询问，可选「立即更新 / 以后再说 / 不再提示此版本」
+（「不再提示」只压住当前这一版，出现更新的版本仍会提醒；这个开关在「设置 → 关于」里可以关掉）。
 
 ### 内核 HTTP API
 

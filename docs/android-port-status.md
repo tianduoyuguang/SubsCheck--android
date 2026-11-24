@@ -12,15 +12,15 @@
 
 | 文件 | 大小 | SHA-256 | 说明 |
 |---|---|---|---|
-| `dist/SubsCheck-1.1.0-arm64-v8a.apk` | 34,395,181 B (32.8MB) | `d2ec594cd95f62d4003b66af558f9e92caecf4db56ad9347f7c26e1ce800f4a7` | arm64 真机 |
-| `dist/SubsCheck-1.1.0-armeabi-v7a.apk` | 34,301,329 B (32.7MB) | `0aaac7a3097e8937a18f5eb9d2ae881a4c9788ade5fa311c71e4fbf64e68ebcd` | armv7 老机器 |
+| `dist/SubsCheck-1.2.7-arm64-v8a.apk` | 34,447,053 B (32.8MB) | `5ba36ad3b00dce802a0a823b9a2bc317a1dcd613de10e0d94001131a847ec11d` | arm64 真机 |
+| `dist/SubsCheck-1.2.7-armeabi-v7a.apk` | 34,365,169 B (32.8MB) | `3ec843133176f270723eeb5a5a13bfd26447e9777725972a04cb03c62f322248` | armv7 老机器 |
 | `dist/README.md` / `dist/SHA256SUMS.txt` | — | — | 安装说明与校验 |
 
 `build/app/outputs/flutter-apk/app-x86_64-release-test.apk`（36.5MB）只用于模拟器验证，**不要分发**。
 
 发布签名 keystore 不纳入版本控制。请使用自己的签名密钥进行分发构建。
 
-- minSdk 24 / targetSdk 28 / versionCode arm64=2002 armv7=1002 / versionName 1.1.0
+- minSdk 24 / targetSdk 28 / versionCode 10 / versionName 1.2.7
 - 应用图标已换成自绘的蓝色圆角对勾（5 个 mipmap 密度全覆盖），启动器实测正常。
 
 ## 架构
@@ -226,6 +226,63 @@ export PATH=$JAVA_HOME/bin:$PATH
 - `flutter analyze` → No issues found；`flutter test` → 2 passed。
 - 产物：`SubsCheck-1.2.4-arm64-v8a.apk`（34,434,513 B，sha256 `40270ab0…5177`）、
   `SubsCheck-1.2.4-armeabi-v7a.apk`（34,349,845 B，sha256 `30ce7f86…48e`），versionCode 7。
+
+### 1.2.7：启动自动检查更新 + 订阅页新增导出自定义位置入口（2026-11-24，MuMu x86_64 release 包复测）
+
+用户需求（m07078 原文）：「加一个启动自动检查更新，可以选择是否更新还有不想更新时可以选择不再提示」；
+追加需求（m07366 原文）：「订阅page上加一个导出自定义位置」。
+
+#### 启动自动检查更新
+
+- 启动流程改为串行：免责声明 → 静默检查更新（`lib/main.dart` 的 `_startupSequence()`），
+  避免两个对话框叠在一起。
+- 检查复用已有的 `lib/src/updater.dart`（`UpdateChecker.check`，三链路 api.github.com → gh-proxy.com → ghfast.top，
+  全失败不抛异常），不阻塞首屏。
+- 新文件 `lib/src/update_prompt.dart`：`showUpdatePrompt(context, {currentVersion, latestVersion, notes})`
+  返回 `UpdateChoice.update / later / skip` 三选一，标题「发现新版本」，正文含 release notes（`BoxConstraints(maxHeight: 220)` 内滚动）。
+- 「不再提示」= **只记住被忽略的那个版本号**（SharedPreferences `update_skip_version`），
+  不是永久关闭：远端版本严格更新时仍会提示。
+- 版本号必须用 `await Native.info()` 的 `versionName`，**不能用 `state.info`**：
+  `_maybeUpdate()` 在首帧后就跑，`AppState.initialize()` 可能未完成，
+  空版本会让 `compareVersion` 把任何版本都判成「有更新」。
+- 「设置 → 关于」新增「启动时自动检查更新」开关（`SwitchListTile`，默认开，
+  SharedPreferences `auto_check_update`）；关闭时清空忽略版本号。
+- 从弹窗点「立即更新」→ `push(AboutPage(autoUpdate: true))`，进入后自动选资产并开始下载，
+  复用 about.dart 已有的下载/安装/权限轮询链路。
+- 原生侧 `MainActivity.kt` 新增三个分支：`updateSkip` / `setUpdateSkip` / `setAutoUpdate`。
+
+#### 订阅页「导出自定义位置」
+
+- 订阅页导出卡片原来三项（完整配置 / 仅节点 / 刷新节点数），在「仅节点」之后插入
+  「导出自定义位置」，副标题动态显示 `widget.state.exportLabel`。
+- 复用 `showExportDirSheet`（与设置页同一个弹窗、同一份逻辑），三个选项：
+  应用私有目录 / 手机 Download/SubsCheck / 自定义目录（SAF）。
+- 注意：这一项**不违反** 1.2.4 的「入口收敛」结论 —— 1.2.4 收敛的是「只读展示」的伪入口；
+  这里是用户明确要求新增的可改入口，且与设置页共用同一份监听刷新逻辑。
+- 弹窗内状态由 `_ExportDirSheetState` 的 `ListenableBuilder(listenable: s)` 驱动，
+  Kotlin 侧 `exportDirChanged` 回推后单选项与「当前导出到」即时刷新。
+
+#### 构建坑（已修）
+
+- 跨盘 Kotlin 增量编译失败：插件源码在 `C:\Users\...\AppData\Local\Pub\Cache`、工程在 `D:\`，
+  `RelocatableFileToPathConverter` 报 `this and base files have different roots`。
+  解法：设 `PUB_CACHE=D:/Android/pubcache` 让依赖解析到 D 盘，并在 `android/gradle.properties` 加
+  `kotlin.incremental=false` 与 `kotlin.incremental.useClasspathSnapshot=false`。
+
+#### 验证与产物
+
+- `flutter analyze` → No issues found；`flutter test` → **10 passed**（新增 6 条：版本比较、
+  「不再提示只压住该版本」、弹窗三个出口各一条）。
+- MuMu x86_64（SDK 32 / Android 12，display 2）release 包实测：
+  免责声明「同意并继续」→ 订阅页「导出自定义位置」条目正常出现（副标题「当前：应用私有目录」）→
+  点击弹出三项选择框 → 选「手机 Download/SubsCheck」→ 弹窗内「当前导出到」立即变为
+  `/storage/emulated/0/Download/SubsCheck` → 关闭弹窗后订阅页副标题同步变为
+  「当前：手机 Download/SubsCheck，点此可改到手机目录或自选文件夹」。
+- 启动更新弹窗未在模拟器上复测（本轮模拟器上 `releases/latest` 返回 1.2.7，与本地同版本故不弹），
+  由 6 条单测/组件测试覆盖。
+- 产物（aapt2 核验 versionCode 10 / versionName 1.2.7 / minSdk 24 / targetSdk 28）：
+  - `dist/SubsCheck-1.2.7-arm64-v8a.apk` 34,447,053 B，sha256 `5ba36ad3b00dce802a0a823b9a2bc317a1dcd613de10e0d94001131a847ec11d`
+  - `dist/SubsCheck-1.2.7-armeabi-v7a.apk` 34,365,169 B，sha256 `3ec843133176f270723eeb5a5a13bfd26447e9777725972a04cb03c62f322248`
 
 ### 1.2.6：测速进度分母修正 + 审查报告全部修理（2026-11-16，测速改动在 MuMu x86_64 复测）
 

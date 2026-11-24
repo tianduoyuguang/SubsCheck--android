@@ -23,6 +23,8 @@ class MainActivity : FlutterActivity() {
         const val REQ_TREE = 9003
         private const val PREFS = "subscheck"
         private const val KEY_DISCLAIMER = "disclaimer_seen"
+        private const val KEY_UPDATE_SKIP = "update_skip_version"
+        private const val KEY_AUTO_UPDATE = "auto_check_update"
     }
 
     private val pool = Executors.newSingleThreadExecutor { r ->
@@ -229,6 +231,26 @@ class MainActivity : FlutterActivity() {
             "setDisclaimerSeen" -> {
                 prefs().edit().putBoolean(KEY_DISCLAIMER, true).apply()
                 mapOf("ok" to true)
+            }
+
+            // 启动自动检查更新时用："不再提示此版本"记下被忽略的版本号，
+            // 下次启动只有当远端版本比它更新时才会再弹。
+            "updateSkip" -> mapOf(
+                "version" to prefs().getString(KEY_UPDATE_SKIP, "").orEmpty(),
+                "auto" to prefs().getBoolean(KEY_AUTO_UPDATE, true)
+            )
+
+            "setAutoUpdate" -> {
+                val on = call.argument<Boolean>("on") ?: true
+                prefs().edit().putBoolean(KEY_AUTO_UPDATE, on).apply()
+                if (on) prefs().edit().remove(KEY_UPDATE_SKIP).apply()
+                mapOf("ok" to true, "auto" to on)
+            }
+
+            "setUpdateSkip" -> {
+                val v = call.argument<String>("version") ?: ""
+                prefs().edit().putString(KEY_UPDATE_SKIP, v).apply()
+                mapOf("ok" to true, "version" to v)
             }
 
             "notifyPermission" -> mapOf("granted" to hasNotificationPermission())

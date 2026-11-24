@@ -10,8 +10,13 @@ import '../src/urls.dart';
 
 /// 「关于」页：版本信息、检查更新、项目/内核地址、开源许可。
 class AboutPage extends StatefulWidget {
-  const AboutPage({super.key, required this.state});
+  const AboutPage({super.key, required this.state, this.autoUpdate = false});
+
   final AppState state;
+
+  /// 启动弹窗里用户点了「立即更新」时为 true：检查到新版本后直接开始下载，
+  /// 免得用户还要在这一页再点一次「下载」。
+  final bool autoUpdate;
 
   @override
   State<AboutPage> createState() => _AboutPageState();
@@ -27,6 +32,9 @@ class _AboutPageState extends State<AboutPage> {
   bool _needInstallPermission = false;
   Timer? _poll;
 
+  /// 启动时是否自动检查更新（默认开）。
+  bool _autoCheck = true;
+
   /// 等待用户去系统设置授权期间的轮询。
   ///
   /// 不能只依赖 Activity.onResume：部分 ROM / 多显示器环境下系统设置页会在
@@ -41,6 +49,21 @@ class _AboutPageState extends State<AboutPage> {
     super.initState();
     _check(silent: true);
     _restorePendingInstall();
+    _loadUpdatePrefs();
+  }
+
+  Future<void> _loadUpdatePrefs() async {
+    try {
+      final p = await Native.updatePrefs();
+      if (mounted) setState(() => _autoCheck = p['auto'] != false);
+    } catch (_) {}
+  }
+
+  Future<void> _toggleAutoCheck(bool on) async {
+    setState(() => _autoCheck = on);
+    try {
+      await Native.setAutoCheckUpdate(on);
+    } catch (_) {}
   }
 
   /// 进程重建、或上次下载到一半离开页面时，内存里「还差授权」的标记会丢。
@@ -108,6 +131,10 @@ class _AboutPageState extends State<AboutPage> {
       } else {
         _toast('已是最新版本');
       }
+    }
+    if (widget.autoUpdate && r.ok && r.hasUpdate) {
+      final a = pickAssetFor(r.assets, (widget.state.info['abi'] ?? '').toString());
+      if (a != null && !_downloading) await _startDownload(a);
     }
   }
 
@@ -280,6 +307,14 @@ class _AboutPageState extends State<AboutPage> {
                       ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.refresh),
                   onTap: _checking ? null : () => _check(),
+                ),
+                const Divider(height: 1),
+                SwitchListTile(
+                  value: _autoCheck,
+                  onChanged: _toggleAutoCheck,
+                  secondary: const Icon(Icons.update),
+                  title: const Text('启动时自动检查更新'),
+                  subtitle: const Text('发现新版本时询问是否更新，可选择不再提示该版本'),
                 ),
                 if (_downloading) ...<Widget>[
                   const Divider(height: 1),

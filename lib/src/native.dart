@@ -67,6 +67,18 @@ class Native {
     await _call('setDisclaimerSeen');
   }
 
+  /// 启动自动检查更新的偏好：version 是被「不再提示此版本」忽略的版本号
+  /// （空串表示没忽略过），auto 是「启动时自动检查」开关（默认开）。
+  static Future<Map<String, dynamic>> updatePrefs() => _call('updateSkip');
+
+  static Future<void> setAutoCheckUpdate(bool on) async {
+    await _call('setAutoUpdate', <String, dynamic>{'on': on});
+  }
+
+  static Future<void> setUpdateSkipVersion(String version) async {
+    await _call('setUpdateSkip', <String, dynamic>{'version': version});
+  }
+
   /// 当前导出目录配置：mode / label / path / privatePath / downloadPath /
   /// hasTree / storageGranted / needsPermission。
   static Future<Map<String, dynamic>> exportInfo() => _call('exportInfo');

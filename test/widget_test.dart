@@ -1,5 +1,8 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:subscheck/src/models.dart';
+import 'package:subscheck/src/update_prompt.dart';
+import 'package:subscheck/src/updater.dart';
 
 void main() {
   test('KernelStatus.fromJson parses pipeline', () {
@@ -105,6 +108,68 @@ void main() {
     expect(n.details.length, 2);
     expect(n.details.first.key, 'cipher');
     expect(n.details.last.value, '/ray');
+  });
+
+  test('版本比较：v 前缀与分段补零', () {
+    expect(compareVersion('1.2.6', '1.2.5'), 1);
+    expect(compareVersion('v1.3', '1.2.9'), 1);
+    expect(compareVersion('1.2.6', '1.2.6'), 0);
+    expect(compareVersion('1.2', '1.2.0'), 0);
+    expect(compareVersion('1.10', '1.9'), 1);
+  });
+
+  test('「不再提示此版本」只压住被忽略的那个版本', () {
+    UpdateResult r(String tag, {String current = '1.2.6'}) => UpdateResult(
+          ok: true,
+          currentVersion: current,
+          latestVersion: tag,
+          assets: const <UpdateAsset>[],
+        );
+    const skipped = 'v1.2.7';
+    bool shouldPrompt(String tag, String current) =>
+        r(tag, current: current).hasUpdate && compareVersion(tag, skipped) > 0;
+
+    // 远端仍是用户忽略过的那个版本 → 不高于它，不再弹。
+    expect(shouldPrompt('v1.2.7', '1.2.6'), false);
+    // 又出了更新的版本 → 重新提示。
+    expect(shouldPrompt('v1.2.8', '1.2.6'), true);
+    // 用户已经装上去了，当前版本更高 → 本来就没有更新。
+    expect(r('v1.2.7', current: '1.2.8').hasUpdate, false);
+  });
+
+  /// 弹一次启动更新框，点 [button]，返回选择结果。
+  Future<String?> tapPrompt(WidgetTester tester, String button) async {
+    String? picked;
+    late BuildContext ctx;
+    await tester.pumpWidget(MaterialApp(
+      home: Builder(builder: (c) {
+        ctx = c;
+        return const Scaffold(body: SizedBox.shrink());
+      }),
+    ));
+    // showDialog 不能在 build 阶段调用，等首帧结束再弹。
+    showUpdatePrompt(
+      ctx,
+      currentVersion: '1.2.6',
+      latestVersion: 'v1.2.7',
+      notes: '修复若干问题',
+    ).then((v) => picked = v);
+    await tester.pumpAndSettle();
+    expect(find.text('发现新版本'), findsOneWidget);
+    expect(find.textContaining('当前 v1.2.6'), findsOneWidget);
+    expect(find.textContaining('修复若干问题'), findsOneWidget);
+    await tester.tap(find.text(button));
+    await tester.pumpAndSettle();
+    return picked;
+  }
+
+  testWidgets('启动更新弹窗三个出口各自返回对应结果', (tester) async {
+    expect(await tapPrompt(tester, '立即更新'), UpdateChoice.update);
+  });
+
+  testWidgets('启动更新弹窗：以后再说 / 不再提示', (tester) async {
+    expect(await tapPrompt(tester, '以后再说'), UpdateChoice.later);
+    expect(await tapPrompt(tester, '不再提示'), UpdateChoice.skip);
   });
 
   test('filterPass 还没涨起来时回落到 available，避免 0/0', () {
