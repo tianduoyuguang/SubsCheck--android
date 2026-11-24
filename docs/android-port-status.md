@@ -267,6 +267,9 @@ export PATH=$JAVA_HOME/bin:$PATH
 - aapt2 核验：versionCode 11 / versionName 1.2.8 / minSdk 24 / targetSdk 28 / compileSdk 36。
 - 产物：`dist/SubsCheck-1.2.8-arm64-v8a.apk`（34,453,613 B，sha256 `225b3a34…0578`）、
   `dist/SubsCheck-1.2.8-armeabi-v7a.apk`（34,368,989 B，sha256 `c299dcb4…1ead`）。
+- 提交 `e3829f7` 已 push master，tag `v1.2.8` 已 push。
+  Release id **456700115**，https://github.com/tianduoyuguang/SubsCheck--android/releases/tag/v1.2.8
+  三资产均 `uploaded`，匿名直链 302→200。
 
 ### 1.2.7：启动自动检查更新 + 订阅页新增导出自定义位置入口（2026-11-24，MuMu x86_64 release 包复测）
 
